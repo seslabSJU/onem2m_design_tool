@@ -882,7 +882,7 @@ async loadResources() {
   height: 80vh;
   padding: 10px;
   margin: 10px;
-  background-color: #fff;
+  background-color: #f3f3f3;
   border-radius: 5px;
   display: flex;  
   flex-direction: column;
@@ -903,7 +903,7 @@ async loadResources() {
   padding: 10px;
   margin: 10px;
   overflow: auto;
-  background-color: #fff;
+  background-color: #f3f3f3;
   border-radius: 5px;
   box-sizing: border-box;
   position: relative;

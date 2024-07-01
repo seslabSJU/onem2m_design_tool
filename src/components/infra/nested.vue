@@ -153,48 +153,55 @@ export default {
             border: "2px solid #8BC34A", 
             backgroundColor: "rgba(139, 195, 74, 0.1)", 
             padding: "6px", 
-            borderRadius: "10px"
+            borderRadius: "10px",
+            justifyContent: 'center'
           };
         case RT_CNT:
           return { 
             border: "2px solid #FF9800", 
             backgroundColor: "rgba(255, 152, 0, 0.1)", 
             padding: "6px", 
-            borderRadius: "10px"
+            borderRadius: "10px",
+            justifyContent: 'center'
           };
         case RT_ACP:
           return { 
             border: "2px solid red", 
             backgroundColor: "rgba(255, 0, 0, 0.1)", 
             padding: "6px", 
-            borderRadius: "10px"
+            borderRadius: "10px",
+            justifyContent: 'center'
           };
         case RT_GRP:
           return { 
             border: "2px solid #9C27B0", 
             backgroundColor: "rgba(156, 39, 176, 0.1)", 
-            borderRadius: "10px"
+            borderRadius: "10px",
+            justifyContent: 'center'
           };
         case RT_SUB:
           return { 
             border: "2px solid #2196F3", 
             backgroundColor: "rgba(33, 150, 243, 0.1)", 
             padding: "6px", 
-            borderRadius: "10px"
+            borderRadius: "10px",
+            justifyContent: 'center'
           };
         case RT_FCNT:
           return { 
             border: "2px solid #FFC107", 
             backgroundColor: "rgba(255, 193, 7, 0.2)", 
             padding: "6px", 
-            borderRadius: "10px"
+            borderRadius: "10px",
+            justifyContent: 'center'
           };
         case RT_TS:
           return { 
             border: "2px solid #3F51B5", 
             backgroundColor: "rgba(63, 81, 181, 0.2)", 
             padding: "6px", 
-            borderRadius: "10px"
+            borderRadius: "10px",
+            justifyContent: 'center'
           };
         default:
           return {};
@@ -206,11 +213,11 @@ export default {
     getIcon(type) {
       const icons = {
         5: null, // null로 설정 -> 아이콘 표시 안함
-        1: acpIcon,
-        2: aeIcon,
-        3: cntIcon,
-        9: grpIcon,
-        23: subIcon,
+        1: null,
+        2: null,
+        3: null,
+        9: null,
+        23: null,
       };
       return icons[type];
     },
