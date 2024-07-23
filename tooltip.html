@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>CSS Tooltips</title>
+	<style>
+		body { text-align: center; }
+		.tooltip {
+			position: relative;
+			display: inline-block;
+			margin: auto;
+		}
+		.tooltip .tooltip-content {
+		 visibility: hidden;
+          width: 220px;
+          background-color: rgba(128, 128, 128, 0.5); /* 반투명한 회색 */
+          padding: 0;
+          color: white;
+          text-align: center;
+          position: absolute;
+          z-index: 1;
+          bottom: 100%;
+          left: 50%;
+          margin-left: -110px;
+		}
+		.tooltip:hover .tooltip-content { visibility: visible; }
+	</style>
+</head>
+
+<body>
+
+	<h1>position set</h1>
+	<br><br><br>
+	<div class="tooltip">
+		<span>here</span>
+		<div class="tooltip-content">
+			<p>this is tooltip</p>
+		</div>
+	</div>
