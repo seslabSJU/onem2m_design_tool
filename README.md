@@ -14,12 +14,17 @@ It is compatible with any platform that follows the oneM2M standards, including 
    ```
    cd onem2m_design_tool-main
    ```
-3. install npm
+3. Check if Node.js is Installed
+   ```
+   node -v
+   ```
+   if Node.js is not installed, you must install Node.js first
+4. install npm
    ```
    npm install
    ```
-4. run
+5. run
    ```
    npm run dev
    ```
-5. Enter the address that appears afterward
+6. Enter the address that appears afterward
