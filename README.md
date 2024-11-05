@@ -19,12 +19,14 @@ It is compatible with any platform that follows the oneM2M standards, including 
    node -v
    ```
    if Node.js is not installed, you must install Node.js first
-4. install npm
+   and Node.js must be version 20
+   <br/>
+5. install npm
    ```
    npm install
    ```
-5. run
+6. run
    ```
    npm run dev
    ```
-6. Enter the address that appears afterward
+7. Enter the address that appears afterward
