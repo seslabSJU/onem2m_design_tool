@@ -9,7 +9,7 @@
             </p>
         </div>
         <ul>
-          <li><a href="https://github.com/LAMXkE/oneM2M-Data-Model-Design-Tool" target="_blank">GitHub</a></li>
+          <li><a href="https://github.com/seslabSJU/onem2m_design_tool" target="_blank">GitHub</a></li>
           <li><a href="https://onem2m.org" target="_blank">about oneM2M</a></li>
           <!-- <li><a href="#">Contact</a></li> -->
         </ul>
