@@ -9,7 +9,7 @@ async function http_resource_retrieve(originator, host, port, path, filterCriter
     'X-M2M-Origin': "CAdmin",
     'Accept': 'application/json',
     'Content-Type': 'application/json',
-    'X-M2M-RVI': '1.0'
+    'X-M2M-RVI': '2a'
   };
 
   try {

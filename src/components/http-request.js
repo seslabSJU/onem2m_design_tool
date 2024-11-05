@@ -108,12 +108,12 @@ async function create_resource(attr, path, targetIP)
 
     
     let headers = {
-        'X-M2M-Origin': originator, // originator가 계속 변하게 하려면, 하드 코딩 하듯이 해야하는데
+        'X-M2M-Origin': originator, // originator가 계속 변하게 하려면, 하드 코딩 하듯이
         "Accept" : "application/json",
         'Content-Type': `application/json;ty=${attrs["header"]["ty"]}`,
         // 'Cache-Control': 'no-cache',
-        'Access-Control-Allow-Origin' : '*',
-        "X-M2M-RVI" : "3",
+        //'Access-Control-Allow-Origin' : '*',
+        "X-M2M-RVI" : "2a",
         "X-M2M-RI" : 12345
     }
 
