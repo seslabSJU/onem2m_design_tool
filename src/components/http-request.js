@@ -112,7 +112,7 @@ async function create_resource(attr, path, targetIP)
         "Accept" : "application/json",
         'Content-Type': `application/json;ty=${attrs["header"]["ty"]}`,
         // 'Cache-Control': 'no-cache',
-        // 'Access-Control-Allow-Origin' : '*',
+        'Access-Control-Allow-Origin' : '*',
         "X-M2M-RVI" : "3",
         "X-M2M-RI" : 12345
     }

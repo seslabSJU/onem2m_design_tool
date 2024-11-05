@@ -204,7 +204,7 @@ export default {
       isDragging: false,
       selectedElement: {},
       targetIP: "",
-      originator: "Cae-test-1"
+      originator: "CAdmin"
     }
   },
 
