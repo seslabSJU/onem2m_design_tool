@@ -10,23 +10,27 @@ It is compatible with any platform that follows the oneM2M standards, including 
    ```
    git clone https://github.com/seslabSJU/onem2m_design_tool.git
    ```
+   
 2. move to the directory
    ```
    cd onem2m_design_tool-main
    ```
+   
 3. Check if Node.js is Installed
    ```
    node -v
    ```
-   if Node.js is not installed, you must install Node.js first
-   and Node.js must be version 20
-   <br/>
+   if Node.js is not installed, you must install Node.js first <br/>
+   and Node.js must be version 20.
+   
 5. install npm
    ```
    npm install
    ```
+   
 6. run
    ```
    npm run dev
    ```
+   
 7. Enter the address that appears afterward
