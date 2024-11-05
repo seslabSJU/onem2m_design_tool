@@ -19,7 +19,7 @@ async function http_resource_retrieve(originator, host, port, path, filterCriter
 
     if (initialResponse.data) {
       const allData = initialResponse.data;  
-      return allData;  
+      return allData;   
     }
     return {}; 
   } catch (error) {

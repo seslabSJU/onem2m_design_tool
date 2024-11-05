@@ -540,11 +540,7 @@ async loadResources() {
         ){
           alert("Invalid Loading(CSE)");
           return false;
-
-
-
-
-
+        
         }
         
         if (Array.isArray(attributeCSE.srt)) {                                                                                                // supportedResourceType                                                                                                   
@@ -575,7 +571,7 @@ async loadResources() {
         }
         const attribute = task.attrs;
 
-        if(task.ty !== RT.ACP){ ACP 
+        if(task.ty === RT.ACP){ ACP 
           
           if (allowedResourcesMap[task.ty].includes('ACP')){
 
@@ -610,7 +606,7 @@ async loadResources() {
         }
         
 
-        if(task.ty !== RT.AE){ /* AE */
+        if(task.ty === RT.AE){ /* AE */
           if(
             (typeof attribute.api == "undefined" || typeof attribute.rr == "undefined" || attribute.srv == "undefined" || attribute.ty !== RT.AE) ||             // Mandatory Attribute
             (typeof attribute.rn !== "undefined" && !/^[a-zA-Z0-9\-._]*$/.test(attribute.rn)) ||                                                                 // resourceName
@@ -639,7 +635,7 @@ async loadResources() {
         }
 
 
-        if(task.ty !== RT.CNT){ /* CNT */
+        if(task.ty === RT.CNT){ /* CNT */
           if(
             (attribute.ty !== RT.CNT) ||                                                                                                      // Mandatory Attribute
             (typeof attribute.lbl !== "undefined" && !/^[a-zA-Z0-9:]*$/.test(attribute.lbl)) ||                                               // labels
@@ -658,7 +654,7 @@ async loadResources() {
         } 
         
         
-        if(task.ty !== RT.SUB){ /* SUB */
+        if(task.ty === RT.SUB){ /* SUB */
           if(
             (typeof attribute.nu == "undefined" || attribute.ty !== RT.SUB) ||                                                                // Mandatory Attribute
             (typeof attribute.lbl !== "undefined" && !/^[a-zA-Z0-9:]*$/.test(attribute.lbl)) ||                                               // labels
@@ -676,7 +672,7 @@ async loadResources() {
         }
 
 
-        if(task.ty !== RT.GRP){ /* GRP */
+        if(task.ty === RT.GRP){ /* GRP */
           if(
             (typeof attribute.mnm == "undefined" || typeof attribute.mid == "undefined" || attribute.ty !== RT.GRP) ||                        // Mandatory Attribute
             (typeof attribute.lbl !== "undefined" && !/^[a-zA-Z0-9:]*$/.test(attribute.lbl)) ||                                               // labels
