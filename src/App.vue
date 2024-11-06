@@ -526,7 +526,7 @@ async loadResources() {
 
       
       const attributeCSE = data.attrs;
-      if(data.ty !== RT.CSE) // ty가 숫자가 아닐때로 수정하는게 맞을듯..?
+      if(data.ty !== RT.CSE) // 수정
       { /* CSE */
        
        if(
