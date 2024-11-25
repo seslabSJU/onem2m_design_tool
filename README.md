@@ -6,9 +6,13 @@ It is based on the oneM2M data standards described in TS-0001. and the tool is w
 	  <img src = "https://github.com/seslabSJU/onem2m_design_tool/blob/main/images/Modeling%20Tool%20Execution%20Screen.png" width = "70%" height = "50%">
 	</p>
 <b>With this tool,</b> you can design the resource structure using a drag-and-drop interface, allowing for intuitive construction of oneM2M-compatible data models.
-Additional features beyond drag-and-drop are also available, which are explained below 🤩 <br/>
+Additional features beyond drag-and-drop are also available, which are explained below <br/>
 It is compatible with any platform that follows the oneM2M standards, including tiny, Mobius, ACME, and others.
-<br/> <br/>
+<br/> 
+📂For more details, please refer to the guide.
+<a href = "https://github.com/seslabSJU/onem2m_design_tool/blob/main/document/design%20tool%20Installation%20guide%20%26%20Usage%20Guide.pdf" target="-blank"><b>Installation guide & Usage Guide</b></a>
+<br/><br/>
+
 
 # functions
 ### 1. Drag & Drop 👆
