@@ -188,6 +188,8 @@ export default {
 
             if(this.selectedElement.rn && this.selectedElement.rn.value) {
                 this.$emit('update-rn', { id: this.element.id, rn: this.selectedElement.rn.value });
+                //alert("Changes saved successfully");
+                this.$emit('close');
             }
         },
         confirmClose() {

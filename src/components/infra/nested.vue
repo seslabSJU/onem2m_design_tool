@@ -73,7 +73,7 @@ const resourceStructure = {
   5: [RT_AE, RT_GRP, RT_MGMTOBJ, RT_ACP, RT_FCNT, RT_CNT, RT_SUB],
   1: [],
   2: [RT_CNT, RT_GRP, RT_SUB, RT_FCNT, RT_TS, RT_TSI, RT_TSR, RT_MGMTOBJ, RT_NODE],
-  3: [RT_CNT, RT_FCNT, RT_TS],
+  3: [RT_CNT, RT_FCNT, RT_TS, RT_SUB],
   4: [],
   9: [],
   16: [],
