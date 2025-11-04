@@ -168,7 +168,14 @@ export default {
         validate(evt) {
             evt.preventDefault();
             for (const [key, value] of Object.entries(this.selectedElement)) {
-                if(value.required && value.value === "") {
+                // Checkbox 타입의 required 검증
+                if(value.required && value.type === "Checkbox" && (!value.value || value.value.length === 0)) {
+                    alert(key + " is required. Please select at least one option.");
+                    return;
+                }
+       
+                // 일반 타입의 required 검증
+                if(value.required && value.type !== "Checkbox" && value.value === "") {
                     alert(key + " is required");
                     return;
                 }
