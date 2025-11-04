@@ -25,7 +25,6 @@ async function select_resource(attr)
 
   const ae_header = ["ty"];
   const cnt_header = ["ty"];
-  const cin_header = ["ty"];
   const grp_header = ["ty"];
   const acp_header = ["ty"];
   const sub_header = ["ty"];
@@ -45,11 +44,6 @@ async function select_resource(attr)
   {
     attribute_list = cnt_header;
     attr_list["type"] = "cnt";
-  }
-  else if (attr["ty"] == 4)
-  {
-    attribute_list = cin_header;
-    attr_list["type"] = "cin";
   }
   else if (attr["ty"] == 9)
   {
@@ -144,10 +138,7 @@ async function create_resource(attr, path, targetIP)
     {
       body_attr = {"m2m:cnt" : attrs["body"]}
     }
-    else if (now_type == "cin")
-    {
-      body_attr = {"m2m:cin" : attrs["body"]}
-    }
+
     else if (now_type == "grp")
     {
       body_attr = {"m2m:grp" : attrs["body"]}

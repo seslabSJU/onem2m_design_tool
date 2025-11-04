@@ -70,7 +70,6 @@ export async function make_request_resource(currentNode, path, targetIP, origina
   //ty에 따라서 호출해야하는 함수가 다름.. 
 
   const cnt_attribute = ['ty', 'rn', 'lbl', 'acpi', 'at', 'aa', 'cr', 'mni', 'mbs', 'mia'];
-  const cin_attribute = ['ty', 'rn', 'lbl', 'con', 'cnf', 'cs', 'or'];
   // if cr == true, value is NULL
   const ae_attribute = ['ty', 'rn', 'lbl', 'at', 'aa', 'ast', 'acpi', 'api', 'rr', 'srv', 'poa'];
   const acp_attribute = ['ty', 'rn', 'ri', 'pi', 'ct', 'lt', 'lbl', 'acpi', 'et', 'st', 'cr', 'pv', 'pvs'];
@@ -93,10 +92,6 @@ export async function make_request_resource(currentNode, path, targetIP, origina
   {
     resource = attribute_check(resource, currentNode, cnt_attribute, path, targetIP);
   }
-  else if (currentNode.ty == 4)
-  {
-    resource = attribute_check(resource, currentNode, cin_attribute, path, targetIP);
-  }
   else if (currentNode.ty == 9)
   {
     resource = attribute_check(resource, currentNode, grp_attribute, path, targetIP);
@@ -106,35 +101,7 @@ export async function make_request_resource(currentNode, path, targetIP, origina
     resource = attribute_check(resource, currentNode, sub_attribute, path, targetIP);
   }
 
-  try {
-    const response = await create_resource(resource, path, targetIP);
-
-    // 성공적으로 생성되면 플래그 설정
-    currentNode.createdOnServer = true;
-    console.log("✅ Resource created and marked: ", currentNode.attrs.rn);
-
-    // 서버 응답에서 ri (Resource ID) 추출하여 저장
-    if (response) {
-      // oneM2M 응답 형식: m2m:ae, m2m:cnt, m2m:cin 등
-      const resourceKey = Object.keys(response).find(key => key.startsWith('m2m:'));
-      if (resourceKey && response[resourceKey]) {
-        const ri = response[resourceKey].ri;
-        if (ri) {
-          currentNode.attrs.ri = ri;
-          console.log("✅ Saved RI:", ri);
-        }
-      }
-    }
-  } catch (error) {
-    console.error("❌ Failed to create resource: ", currentNode.attrs.rn, error);
-
-    // 중복 에러(409)인 경우에도 이미 서버에 있다는 뜻이므로 플래그 설정
-    if (error.response && error.response.status === 409) {
-      currentNode.createdOnServer = true;
-      console.log("⚠️ Resource already exists on server, marked as created: ", currentNode.attrs.rn);
-    }
-    // 실패 시에도 에러를 던지지 않고 계속 진행
-  } 
+  await create_resource(resource, path, targetIP); 
 
   return resource
 }
@@ -162,12 +129,7 @@ export function bfs_json(jsonData, targetIP)
           rn_list = parentRn + "/" + currentNode.attrs.rn; // 부모 노드 정보와 현재 노드의 rn 조합
           if (currentNode.hasOwnProperty("id"))
           {
-            // 이미 서버에 생성된 리소스는 건너뛰기
-            if (currentNode.createdOnServer) {
-              console.log("Skipping already created resource: ", currentNode.attrs.rn);
-            } else {
-              resource_req_que.push(await make_request_resource(currentNode, rn_list, targetIP)); // 비동기 작업 실행 후 결과를 기다림
-            }
+            resource_req_que.push(await make_request_resource(currentNode, rn_list, targetIP)); // 비동기 작업 실행 후 결과를 기다림
           }
         }
 

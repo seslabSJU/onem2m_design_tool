@@ -290,10 +290,10 @@ export const resourceAttributes = {
             type: "Checkbox", 
             fullName: "Supported Release Version",
             description: "Set supported Release Version",
-            options: {'1': '1', '2': '2', '2a': '2a', '3': '3', '4': '4', '5': '5'}, 
+            options:['1', '2', '2a', '3', '4', '5'], 
             required:true, 
             disable: false, 
-            value: []
+            value: ['2a','3']
         },
         'poa': {
             type: "Array", 
@@ -668,71 +668,12 @@ export const resourceAttributes = {
             value: 0
         },
         'ty': {
-            type: "Number",
+            type: "Number", 
             fullName: "Resource Type",
             description: "The resource type of the resource",
-            required:true,
-            disable: true,
+            required:true, 
+            disable: true, 
             value: 23
-        },
-    },
-
-    4: { // CIN (ContentInstance)
-        'rn': {
-            type: "text",
-            fullName: "Resource Name",
-            description: "The name of the resource",
-            required: false,
-            disable: false,
-            value: ''
-        },
-        'lbl': {
-            type: "Array",
-            fullName: "Label",
-            description: "The label of the resource. Separate with ,(comma)",
-            required: false,
-            disable: false,
-            value: []
-        },
-        'con': {
-            type: "text",
-            fullName: "Content",
-            description: "The actual data content of the ContentInstance",
-            required: true,
-            disable: false,
-            value: ''
-        },
-        'cnf': {
-            type: "text",
-            fullName: "Content Info",
-            description: "MIME type of the content (e.g., text/plain, application/json)",
-            required: false,
-            disable: false,
-            value: 'text/plain'
-        },
-        'cs': {
-            type: "Number",
-            fullName: "Content Size",
-            description: "Size of the content in bytes",
-            required: false,
-            disable: true,
-            value: 0
-        },
-        'or': {
-            type: "text",
-            fullName: "Ontology Ref",
-            description: "Reference to an ontology",
-            required: false,
-            disable: false,
-            value: ''
-        },
-        'ty': {
-            type: "Number",
-            fullName: "Resource Type",
-            description: "The resource type of the resource",
-            required: true,
-            disable: true,
-            value: 4
         },
     },
 };
