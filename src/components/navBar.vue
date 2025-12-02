@@ -20,15 +20,29 @@
 
   <style scoped>
   .component-navbar {
-  background-color: #4374D9; /* Set the background color for the navbar */
-  padding: 10px; /* Add padding to provide spacing */
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 15px 20px;
+  border-radius: 20px;
+  margin: 10px 25px 10px 25px;
+  box-shadow:
+    0 10px 30px rgba(102, 126, 234, 0.4),
+    0 1px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  position: relative;
+  backdrop-filter: blur(10px);
 }
 
 .component-navbar .title {
-  color: #fff; /* White text color */
-  font-size: 25px; /* Larger font size */
-  font-weight: bold; /* Bold font weight */
-    display: inline; /* Make the title appear inline */
+  color: #fff;
+  font-size: 26px;
+  font-weight: 600;
+  display: inline;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.5px;
 }
 
 .component-navbar .title p {
@@ -54,14 +68,23 @@
 }
 
 .component-navbar a {
-  text-decoration: none; /* Remove underlines from links */
-  color: #fff; /* Set the text color to white */
-  font-weight: bold; /* Make the text bold */
-  font-size: 16px; /* Adjust the font size */
+  text-decoration: none;
+  color: #fff;
+  font-weight: 500;
+  font-size: 15px;
+  padding: 8px 18px;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-block;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(5px);
 }
 
 .component-navbar a:hover {
-  text-decoration: underline; /* Add underline on hover */
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.25);
 }
 
   </style>
