@@ -214,13 +214,14 @@
             pull: false,
             put: false
           }"
-          :childRT="[2, 9, 1, 3, 4, 23]"
+          :childRT="[2, 9, 1, 3, 4, 23, 28, 58]"
           :min-height="200"
           item-key="id"
           @clicked="(element) => {
             this.setAttributes(element);
           }"
           @toggle-expand="handleToggleExpand"
+          @load-all-instances="loadAllInstances"
           class="dragArea resourceTree zoom-tree"
         ></nestedDraggable>
       </div>
@@ -298,39 +299,25 @@ export default {
       subscriptionResourceName: null,
       flashingResources: new Set(),
       flashingEffectEnabled: true,  // 번쩍이는 효과 토글 (기본값: 켜짐)
-      mqttTopic: '/oneM2M/req/TinyIoT/designTool',  // oneM2M 표준 형식 (맨 앞 /  필수!)
+      mqttTopic: '/oneM2M/req/tinyiot/designTool',  // oneM2M 표준 형식 (맨 앞 /  필수!)
       // 확대 뷰 관련
       showZoomView: false,
-      zoomedAE: null
+      zoomedAE: null,
+      zoomedClone: null
     }
   },
 
   computed: {
-    // 확대 뷰용 트리 - 실시간 동기화를 위해 computed로 구현
+    // 확대 뷰용 트리 - 딥 클론 기반 (메인 트리에 영향 없음)
     zoomedTree() {
-      if (!this.zoomedAE || !this.cse1 || this.cse1.length === 0) {
+      if (!this.zoomedClone || !this.cse1 || this.cse1.length === 0) {
         return [];
       }
 
-      // 원본 CSE 데이터에서 선택한 AE만 필터링 (참조 유지)
       const cseData = this.cse1[0];
-      if (!cseData || !cseData.tasks) {
-        return [];
-      }
+      if (!cseData) return [];
 
-      // 선택한 AE 찾기 (원본 참조 유지)
-      const selectedAE = cseData.tasks.find(ae => ae.id === this.zoomedAE.id);
-      if (!selectedAE) {
-        return [];
-      }
-
-      // CSE 복사본 생성 (shallow copy)
-      const cseClone = {
-        ...cseData,
-        tasks: [selectedAE] // 선택한 AE만 포함 (원본 참조)
-      };
-
-      return [cseClone];
+      return [{ ...cseData, tasks: [this.zoomedClone] }];
     }
   },
 
@@ -362,16 +349,116 @@ export default {
     },
 
     // 확대 뷰 관련 함수
-    openZoomView(aeElement) {
-      console.log("[openZoomView] Opening zoom view for AE:", aeElement.attrs?.rn);
-      // zoomedTree는 computed property로 자동 생성됨 (실시간 동기화 지원)
-      this.zoomedAE = aeElement;
+    async openZoomView(element) {
+      console.log("[openZoomView] Opening zoom view for:", element.attrs?.rn, "ty:", element.ty);
+      this.zoomedAE = element;
+
+      // 딥 클론 생성 → 인스턴스는 클론에만 로드 (메인 트리 영향 없음)
+      const clone = JSON.parse(JSON.stringify(element));
+      // 클론에서 메인 트리의 trimmed CIN/FCIN 제거 (중복 방지)
+      this.stripCloneInstances(clone);
+      this.zoomedClone = clone;
       this.showZoomView = true;
+
+      // reactive proxy(this.zoomedClone)에 인스턴스 로드 → Vue가 변경 감지
+      await this.loadInstancesForTree(this.zoomedClone, 5);
     },
 
     closeZoomView() {
       this.showZoomView = false;
       this.zoomedAE = null;
+      this.zoomedClone = null;
+    },
+
+    // 클론에서 CIN/FCIN 노드 제거 (줌뷰 로드 전 정리)
+    stripCloneInstances(node) {
+      if (node.tasks) {
+        node.tasks = node.tasks.filter(t => t.ty !== 4 && t.ty !== 58);
+        node.tasks.forEach(child => this.stripCloneInstances(child));
+      }
+    },
+
+    // 노드와 그 하위의 모든 CNT/FCNT에서 CIN/FCIN 인스턴스 로드
+    async loadInstancesForTree(node, limit) {
+      const target = this.parseTargetUrl(this.targetIP);
+      if (!target) return;
+
+      // CNT(ty=3) → CIN(ty=4) 로드
+      if (node.ty === 3 && node.fullPath && !node.instancesLoaded) {
+        try {
+          const path = node.fullPath;
+          const disc = await http_resource_retrieve(
+            this.originator, target.host, target.port, path, `fu=1&ty=4&lim=${limit}`
+          );
+          const uris = disc['m2m:uril'] || [];
+
+          for (const uri of uris) {
+            const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
+            try {
+              const cinData = await http_resource_retrieve(
+                this.originator, target.host, target.port, cleanUri, ''
+              );
+              if (cinData['m2m:cin']) {
+                node.tasks.push(this.convertNode(cinData['m2m:cin'], 'CIN', 0, false));
+              }
+            } catch (err) {
+              console.warn(`[loadInstances] Failed to load CIN: ${cleanUri}`);
+            }
+          }
+          node.instancesLoaded = true;
+          node.instancesLoadedAll = false;
+          console.log(`[loadInstances] Loaded ${uris.length} CINs for ${node.attrs?.rn}`);
+        } catch (error) {
+          console.warn(`[loadInstances] No CINs for ${node.attrs?.rn}`);
+        }
+      }
+
+      // FCNT(ty=28) → FCIN(ty=58) 로드
+      if (node.ty === 28 && node.fullPath && !node.instancesLoaded) {
+        try {
+          const path = node.fullPath;
+          const disc = await http_resource_retrieve(
+            this.originator, target.host, target.port, path, `fu=1&ty=58&lim=${limit}`
+          );
+          const uris = disc['m2m:uril'] || [];
+
+          for (const uri of uris) {
+            const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
+            try {
+              const fcinData = await http_resource_retrieve(
+                this.originator, target.host, target.port, cleanUri, ''
+              );
+              if (fcinData['m2m:fcin']) {
+                node.tasks.push(this.convertNode(fcinData['m2m:fcin'], 'FCIN', 0, false));
+              }
+            } catch (err) {
+              console.warn(`[loadInstances] Failed to load FCIN: ${cleanUri}`);
+            }
+          }
+          node.instancesLoaded = true;
+          node.instancesLoadedAll = false;
+          console.log(`[loadInstances] Loaded ${uris.length} FCINs for ${node.attrs?.rn}`);
+        } catch (error) {
+          console.warn(`[loadInstances] No FCINs for ${node.attrs?.rn}`);
+        }
+      }
+
+      // 자식 재귀
+      if (node.tasks) {
+        for (const child of node.tasks) {
+          await this.loadInstancesForTree(child, limit);
+        }
+      }
+    },
+
+    // 전체 인스턴스 로드 (▼ All 버튼)
+    async loadAllInstances(element) {
+      console.log("[loadAllInstances] Loading all instances for:", element.attrs?.rn);
+      // 기존 CIN/FCIN 제거 후 전체 재로드
+      element.tasks = element.tasks.filter(t => t.ty !== 4 && t.ty !== 58);
+      element.instancesLoaded = false;
+      await this.loadInstancesForTree(element, 1000);
+      element.instancesLoadedAll = true;
     },
 
     handleUpdateRn(data) {
@@ -467,7 +554,7 @@ export default {
 
 // 서버에 있는 리소스 가져오는 코드 눌럿을때 실행되는 곳
 async loadResources() {
-    console.log("[loadResources] Loading ALL resources (except CIN) from CSE using Discovery...");
+    console.log("[loadResources] Loading resources from CSE using rcn=4...");
     sessionStorage.setItem('targetIP', this.targetIP);
 
     if (this.targetIP === "") {
@@ -495,174 +582,31 @@ async loadResources() {
     try {
       const startTime = performance.now();
 
-      // Step 1: Discovery로 모든 AE URI 찾기
-      console.log("[loadResources] Step 1: Discovering all AEs (ty=2)...");
-      const aeDiscoveryData = await http_resource_retrieve(this.originator, target.host, target.port, target.basePath, 'fu=1&ty=2&lim=1000');
-      const aeUris = aeDiscoveryData['m2m:uril'] || [];
-      console.log(`[loadResources] Found ${aeUris.length} AEs via Discovery`);
+      // 1. 단일 rcn=4 요청으로 전체 트리 가져오기
+      console.log("[loadResources] Retrieving full tree with rcn=4...");
+      const data = await http_resource_retrieve(this.originator, target.host, target.port, target.basePath, 'rcn=4&lim=10000');
 
-      // Step 2: CSE Base를 rcn=4로 retrieve (ACP 정보를 위해)
-      console.log("[loadResources] Step 2: Retrieving CSE Base with rcn=4...");
-      const cseData = await http_resource_retrieve(this.originator, target.host, target.port, target.basePath, 'rcn=4');
-      const cseInfo = cseData['m2m:cb'];
-      console.log(`[loadResources] CSE loaded (ACPs: ${cseInfo['m2m:acp']?.length || 0})`);
+      // 2. CIN/FCIN 최신 1개만 남기기 (메인 트리 미리보기용)
+      this.trimInstances(data);
 
-      // Step 3: 각 AE를 Discovery로 CNT만 가져오기 (CIN 제외)
-      console.log("[loadResources] Step 3: Retrieving each AE (CNT only, CIN excluded)...");
-      const fullAeList = [];
-
-      for (let i = 0; i < aeUris.length; i++) {
-        const aeUri = aeUris[i].startsWith('/') ? aeUris[i].substring(1) : aeUris[i];
-
-        try {
-          console.log(`[loadResources] Retrieving AE ${i+1}/${aeUris.length}: ${aeUri}`);
-
-          // AE 기본 정보만 가져오기
-          const aeData = await http_resource_retrieve(this.originator, target.host, target.port, aeUri, '');
-          const ae = aeData['m2m:ae'];
-
-          // Discovery로 모든 CNT URI 가져오기
-          try {
-            const cntDiscoveryData = await http_resource_retrieve(this.originator, target.host, target.port, aeUri, 'fu=1&ty=3&lim=1000');
-            const cntUris = cntDiscoveryData['m2m:uril'] || [];
-            console.log(`  Found ${cntUris.length} CNTs`);
-
-            if (cntUris.length > 0) {
-              // 각 CNT를 개별 조회하여 실제 속성으로 트리 생성
-              ae['m2m:cnt'] = await this.buildCntTreeWithRealAttributes(cntUris, aeUri, target.host, target.port);
-            }
-          } catch (error) {
-            console.warn(`  No CNTs found`);
-          }
-
-          // ACP도 Discovery로 가져오기
-          try {
-            const acpDiscoveryData = await http_resource_retrieve(this.originator, target.host, target.port, aeUri, 'fu=1&ty=1&lim=100');
-            const acpUris = acpDiscoveryData['m2m:uril'] || [];
-            if (acpUris.length > 0) {
-              console.log(`  Found ${acpUris.length} ACPs`);
-              ae['m2m:acp'] = [];
-              for (const acpUri of acpUris) {
-                const cleanAcpUri = acpUri.startsWith('/') ? acpUri.substring(1) : acpUri;
-                try {
-                  const acpData = await http_resource_retrieve(this.originator, target.host, target.port, cleanAcpUri, '');
-                  ae['m2m:acp'].push(acpData['m2m:acp']);
-                } catch (err) {
-                  console.warn(`  Failed to retrieve ACP ${cleanAcpUri}`);
-                }
-              }
-            }
-          } catch (error) {
-            // ACP가 없는 경우
-          }
-
-          fullAeList.push(ae);
-        } catch (error) {
-          console.warn(`[loadResources] Failed to retrieve AE ${aeUri}:`, error.message);
-        }
-      }
-
-      // Step 4: CSE 직속 CNT 로드 (AE가 아닌 CNT - modelRepo 등)
-      console.log("[loadResources] Step 4: Discovering CSE's direct CNTs (ty=3, drt=1)...");
-      const cseCntList = [];
-      try {
-        const cseCntDiscovery = await http_resource_retrieve(this.originator, target.host, target.port, target.basePath, 'fu=1&ty=3&drt=1');
-        const allCntUris = cseCntDiscovery['m2m:uril'] || [];
-
-        // Filter to only truly direct CNTs (CSE/CNT, not CSE/AE/CNT or deeper)
-        const basePathParts = target.basePath.split('/').filter(p => p);
-        const cseCntUris = allCntUris.filter(uri => {
-          const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
-          const parts = cleanUri.split('/').filter(p => p);
-          // Direct CNT should be exactly 1 level deeper than CSE base path
-          return parts.length === basePathParts.length + 1;
-        });
-
-        console.log(`  Found ${cseCntUris.length} direct CNTs under CSE (filtered from ${allCntUris.length} total)`);
-
-        for (const cntUri of cseCntUris) {
-          const cleanCntUri = cntUri.startsWith('/') ? cntUri.substring(1) : cntUri;
-
-          try {
-            // CNT 기본 정보 가져오기
-            const cntData = await http_resource_retrieve(this.originator, target.host, target.port, cleanCntUri, '');
-            const cnt = cntData['m2m:cnt'];
-
-            // 이 CNT 하위의 모든 CNT도 가져오기 (재귀적으로)
-            try {
-              const subCntDiscovery = await http_resource_retrieve(this.originator, target.host, target.port, cleanCntUri, 'fu=1&ty=3&lim=1000');
-              const subCntUris = subCntDiscovery['m2m:uril'] || [];
-
-              if (subCntUris.length > 0) {
-                console.log(`    CNT ${cnt.rn} has ${subCntUris.length} sub-CNTs`);
-                cnt['m2m:cnt'] = await this.buildCntTreeWithRealAttributes(subCntUris, cleanCntUri, target.host, target.port);
-              }
-            } catch (error) {
-              // No sub-CNTs
-            }
-
-            cseCntList.push(cnt);
-          } catch (error) {
-            console.warn(`  Failed to retrieve CNT ${cleanCntUri}:`, error.message);
-          }
-        }
-      } catch (error) {
-        console.log("  No direct CNTs found under CSE");
-      }
-
-      // Step 5: CSE 직속 SUB 로드 (최신 1개만)
-      console.log("[loadResources] Step 5: Discovering CSE's direct SUBs (ty=23, drt=1, lim=1)...");
-      const cseSubList = [];
-      try {
-        const cseSubDiscovery = await http_resource_retrieve(this.originator, target.host, target.port, target.basePath, 'fu=1&ty=23&drt=1&lim=1');
-        const allSubUris = cseSubDiscovery['m2m:uril'] || [];
-
-        // Filter to only truly direct SUBs (CSE/SUB, not CSE/AE/CNT/SUB or deeper)
-        const basePathParts = target.basePath.split('/').filter(p => p);
-        const cseSubUris = allSubUris.filter(uri => {
-          const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
-          const parts = cleanUri.split('/').filter(p => p);
-          // Direct SUB should be exactly 1 level deeper than CSE base path
-          return parts.length === basePathParts.length + 1;
-        });
-
-        console.log(`  Found ${cseSubUris.length} direct SUBs under CSE (filtered from ${allSubUris.length} total, limited to 1)`);
-
-        for (const subUri of cseSubUris) {
-          const cleanSubUri = subUri.startsWith('/') ? subUri.substring(1) : subUri;
-
-          try {
-            const subData = await http_resource_retrieve(this.originator, target.host, target.port, cleanSubUri, '');
-            cseSubList.push(subData['m2m:sub']);
-          } catch (error) {
-            console.warn(`  Failed to retrieve SUB ${cleanSubUri}:`, error.message);
-          }
-        }
-      } catch (error) {
-        console.log("  No direct SUBs found under CSE");
-      }
-
-      // Step 6: CSE에 모든 자식 리소스 추가 (AE, CNT, SUB)
-      cseInfo['m2m:ae'] = fullAeList;
-      if (cseCntList.length > 0) {
-        cseInfo['m2m:cnt'] = cseCntList;
-      }
-      if (cseSubList.length > 0) {
-        cseInfo['m2m:sub'] = cseSubList;
-      }
-      console.log(`[loadResources] Step 6: Combined ${fullAeList.length} AEs, ${cseCntList.length} CNTs, ${cseSubList.length} SUBs into CSE tree`);
-
-      // Step 7: 전체 트리 구조 변환
-      console.log("[loadResources] Step 7: Converting tree structure...");
-      const fullData = { 'm2m:cb': cseInfo };
-
-      const convertedData = this.convertListToFileFormatFull(fullData);
+      // 3. 변환 + 렌더링
+      console.log("[loadResources] Converting tree structure...");
+      const convertedData = this.convertListToFileFormatFull(data);
       console.log("[loadResources] Converted data:", convertedData);
 
       // CSE에 플래그 설정
       if (convertedData[0]) {
         convertedData[0].childrenLoaded = true;
         convertedData[0].allResourcesLoaded = true;
+
+        // CSE 직속 CNT/FCNT에 플래그 (돋보기 표시용)
+        if (convertedData[0].tasks) {
+          convertedData[0].tasks.forEach(child => {
+            if (child.ty === 3 || child.ty === 28) {
+              child.cseDirectChild = true;
+            }
+          });
+        }
         convertedData[0].allCollapsed = false;
         convertedData[0].expanded = true;
       }
@@ -670,7 +614,7 @@ async loadResources() {
       sessionStorage.setItem('CSE1', JSON.stringify(convertedData, null, 2));
       this.loadFromSessionStorage();
 
-      // fullPath 업데이트 (중요!)
+      // fullPath 업데이트
       this.updateFullPaths();
       this.syncSessionStorage();
 
@@ -691,348 +635,28 @@ async loadResources() {
 
       console.log(`[loadResources] ✅ Loaded ${totalResources} resources in ${(endTime - startTime).toFixed(2)}ms`);
 
-      // Step 8: 모든 CNT에 Subscription 자동 생성
-      console.log("[loadResources] Step 8: Creating subscriptions for all CNTs...");
-      try {
-        const stats = await this.createSubscriptionsForAllCNTs();
-        console.log(`[loadResources] ✅ Subscription setup completed: ${stats.created} created, ${stats.reused} reused, ${stats.errors} errors out of ${stats.total} CNTs`);
-
-        // 리소스 다시 로드하여 새로 생성된 Subscription을 트리에 반영
-        if (stats.created > 0) {
-          console.log("[loadResources] Reloading resources to show new subscriptions...");
-          // 현재 origintor와 targetIP는 이미 설정되어 있으므로 단순 재로드
-          const reloadData = await http_resource_retrieve(this.originator, target.host, target.port, target.basePath, 'rcn=4');
-          const reloadCseInfo = reloadData['m2m:cb'];
-
-          // AE 목록은 이미 로드되어 있으므로 각 AE를 업데이트
-          for (const ae of fullAeList) {
-            const aeUri = `${target.basePath}/${ae.rn}`;
-
-            // AE 직속 SUB 로드
-            try {
-              const aeSubDiscovery = await http_resource_retrieve(this.originator, target.host, target.port, aeUri, 'fu=1&ty=23');
-              const aeSubUris = aeSubDiscovery['m2m:uril'] || [];
-              if (aeSubUris.length > 0) {
-                ae['m2m:sub'] = [];
-                for (const subUri of aeSubUris) {
-                  const cleanSubUri = subUri.startsWith('/') ? subUri.substring(1) : subUri;
-                  try {
-                    const subData = await http_resource_retrieve(this.originator, target.host, target.port, cleanSubUri, '');
-                    ae['m2m:sub'].push(subData['m2m:sub']);
-                  } catch (err) {
-                    console.warn(`Failed to retrieve SUB ${cleanSubUri}`);
-                  }
-                }
-              }
-            } catch (error) {
-              // No SUBs found
-            }
-          }
-
-          // 전체 트리 재생성
-          reloadCseInfo['m2m:ae'] = fullAeList;
-          if (cseCntList.length > 0) {
-            reloadCseInfo['m2m:cnt'] = cseCntList;
-          }
-          if (cseSubList.length > 0) {
-            reloadCseInfo['m2m:sub'] = cseSubList;
-          }
-
-          const reloadFullData = { 'm2m:cb': reloadCseInfo };
-          const reloadConvertedData = this.convertListToFileFormatFull(reloadFullData);
-
-          if (reloadConvertedData[0]) {
-            reloadConvertedData[0].childrenLoaded = true;
-            reloadConvertedData[0].allResourcesLoaded = true;
-            reloadConvertedData[0].allCollapsed = false;
-            reloadConvertedData[0].expanded = true;
-          }
-
-          sessionStorage.setItem('CSE1', JSON.stringify(reloadConvertedData, null, 2));
-          this.loadFromSessionStorage();
-          this.updateFullPaths();
-          this.syncSessionStorage();
-        }
-      } catch (error) {
-        console.warn("[loadResources] ⚠️ Failed to create subscriptions:", error);
-        // Subscription 생성 실패는 치명적이지 않으므로 경고만 표시
-      }
-
     } catch (error) {
       console.error("[loadResources] ❌ Failed to load resources:", error);
       alert("Failed to load resources. See console for details.");
     }
   },
 
-  // Discovery로 찾은 CNT들을 개별 조회하여 실제 속성으로 트리 생성
-  async buildCntTreeWithRealAttributes(cntUris, aeUri, host, port) {
-    const cleanAeUri = aeUri.startsWith('/') ? aeUri.substring(1) : aeUri;
-    const aePathParts = cleanAeUri.split('/');
-
-    // 1. 중간 부모 CNT 경로 추출
-    const allCntPaths = new Set();
-    const parentPaths = new Set(); // 부모 CNT 경로만 별도로 저장
-
-    for (const uri of cntUris) {
-      const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
-      allCntPaths.add(cleanUri);
-
-      // 중간 부모 경로도 추가
-      const parts = cleanUri.split('/');
-      for (let i = aePathParts.length + 1; i < parts.length; i++) {
-        const parentPath = parts.slice(0, i).join('/');
-        allCntPaths.add(parentPath);
-        parentPaths.add(parentPath);
+  // CIN/FCIN을 최신 1개만 남기고 나머지 제거 (메인 트리 미리보기용)
+  trimInstances(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    if (Array.isArray(obj['m2m:cin']) && obj['m2m:cin'].length > 0) {
+      obj['m2m:cin'] = obj['m2m:cin'].slice(-1);
+    }
+    if (Array.isArray(obj['m2m:fcin']) && obj['m2m:fcin'].length > 0) {
+      obj['m2m:fcin'] = obj['m2m:fcin'].slice(-1);
+    }
+    for (const key of Object.keys(obj)) {
+      if (Array.isArray(obj[key])) {
+        obj[key].forEach(item => this.trimInstances(item));
+      } else if (typeof obj[key] === 'object') {
+        this.trimInstances(obj[key]);
       }
     }
-
-    console.log(`    Discovery found: ${cntUris.length} CNT URIs`);
-    console.log(`    Total CNT paths (including parents): ${allCntPaths.size}`);
-
-    // 2. 각 부모 CNT에 대해 직속 자식 확인 (Discovery가 누락시킨 CNT 발견)
-    console.log(`    Checking ${parentPaths.size} parent CNTs for missing children...`);
-    for (const parentPath of parentPaths) {
-      // Discovery로 직속 자식 찾기 (drt=1)
-      try {
-        const childDiscovery = await http_resource_retrieve(this.originator, host, port, parentPath, 'fu=1&ty=3&drt=1');
-        const childUris = childDiscovery['m2m:uril'] || [];
-
-        for (const childUri of childUris) {
-          const cleanChildUri = childUri.startsWith('/') ? childUri.substring(1) : childUri;
-          if (!allCntPaths.has(cleanChildUri)) {
-            console.log(`      Found missing CNT via Discovery: ${cleanChildUri}`);
-            allCntPaths.add(cleanChildUri);
-          }
-        }
-      } catch (error) {
-        // Discovery 실패는 무시
-      }
-
-      // rcn=4로도 확인 (Discovery가 일부만 반환할 수 있음)
-      try {
-        const parentData = await http_resource_retrieve(this.originator, host, port, parentPath, 'rcn=4');
-        const parentCnt = parentData['m2m:cnt'];
-
-        if (parentCnt['m2m:cnt'] && Array.isArray(parentCnt['m2m:cnt'])) {
-          // rcn=4로 찾은 직속 자식 CNT들을 allCntPaths에 추가
-          for (const childCnt of parentCnt['m2m:cnt']) {
-            const childPath = `${parentPath}/${childCnt.rn}`;
-            if (!allCntPaths.has(childPath)) {
-              console.log(`      Found missing CNT via rcn=4: ${childPath}`);
-              allCntPaths.add(childPath);
-            }
-          }
-        }
-      } catch (error) {
-        // rcn=4 실패는 무시 (CIN이 너무 많은 경우 등)
-      }
-    }
-
-    console.log(`    Total CNT paths after rcn=4 check: ${allCntPaths.size}`);
-
-    // 3. 모든 CNT의 실제 속성 가져오기 - 병렬 처리
-    const cntDataMap = new Map();
-    const cntPathsArray = Array.from(allCntPaths);
-
-    // 배치 단위로 병렬 처리 (10개씩)
-    const batchSize = 10;
-    for (let i = 0; i < cntPathsArray.length; i += batchSize) {
-      const batch = cntPathsArray.slice(i, i + batchSize);
-
-      const results = await Promise.allSettled(
-        batch.map(async (path) => {
-          const cntData = await http_resource_retrieve(this.originator, host, port, path, '');
-          return { path, cnt: cntData['m2m:cnt'] };
-        })
-      );
-
-      // 성공한 결과만 Map에 추가
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value) {
-          cntDataMap.set(result.value.path, result.value.cnt);
-        } else if (result.status === 'rejected') {
-          console.warn(`    Failed to retrieve CNT`);
-        }
-      }
-    }
-
-    console.log(`    Retrieved ${cntDataMap.size}/${allCntPaths.size} CNTs with real attributes`);
-
-    // 4. 트리 구조 생성
-    const rootCnts = [];
-    const pathToChildren = new Map();
-
-    // 부모-자식 관계 파악
-    for (const [path, cnt] of cntDataMap.entries()) {
-      const parts = path.split('/');
-      const parentPath = parts.slice(0, -1).join('/');
-
-      if (!pathToChildren.has(parentPath)) {
-        pathToChildren.set(parentPath, []);
-      }
-      pathToChildren.get(parentPath).push({ path, cnt });
-    }
-
-    // 재귀적으로 트리 구성 (CIN 5개 + SUB 전체 자동 로드)
-    const buildTree = async (parentPath) => {
-      const children = pathToChildren.get(parentPath) || [];
-      const result = [];
-
-      for (const { path, cnt } of children) {
-        // 1. 자식 CNT 재귀 로드
-        const childCnts = await buildTree(path);
-        if (childCnts.length > 0) {
-          cnt['m2m:cnt'] = childCnts;
-        }
-
-        // 2. CIN 로드 (최신 5개, 손상된 것 제외) - 병렬 처리
-        try {
-          // 손상된 리소스를 고려하여 더 많이 가져옴
-          const cinDiscovery = await http_resource_retrieve(this.originator, host, port, path, 'fu=1&ty=4&lim=20');
-          const cinUris = cinDiscovery['m2m:uril'] || [];
-
-          if (cinUris.length > 0) {
-            cnt['m2m:cin'] = [];
-            const targetCount = 5; // 목표 CIN 개수
-
-            // 병렬 요청 (배치 크기: 10개씩)
-            const batchSize = 10;
-            for (let i = 0; i < cinUris.length && cnt['m2m:cin'].length < targetCount; i += batchSize) {
-              const batch = cinUris.slice(i, i + batchSize);
-
-              // 배치 내 모든 요청을 병렬로 실행
-              const results = await Promise.allSettled(
-                batch.map(async (cinUri) => {
-                  const cleanCinUri = cinUri.startsWith('/') ? cinUri.substring(1) : cinUri;
-                  const cinData = await http_resource_retrieve(this.originator, host, port, cleanCinUri, '');
-                  return cinData['m2m:cin'];
-                })
-              );
-
-              // 성공한 결과만 추가
-              for (const result of results) {
-                if (result.status === 'fulfilled' && result.value) {
-                  cnt['m2m:cin'].push(result.value);
-                  if (cnt['m2m:cin'].length >= targetCount) {
-                    break;
-                  }
-                } else if (result.status === 'rejected') {
-                  // 실패는 조용히 무시 (이미 손상된 리소스 예상)
-                }
-              }
-            }
-            console.log(`      Loaded ${cnt['m2m:cin'].length} CINs for ${path}`);
-          }
-        } catch (error) {
-          // No CIN found, ignore
-        }
-
-        // 3. SUB 로드 (최신 1개만)
-        try {
-          const subDiscovery = await http_resource_retrieve(this.originator, host, port, path, 'fu=1&ty=23&lim=1');
-          const subUris = subDiscovery['m2m:uril'] || [];
-
-          if (subUris.length > 0) {
-            cnt['m2m:sub'] = [];
-
-            // 최신 1개 SUB만 로드
-            const results = await Promise.allSettled(
-              subUris.map(async (subUri) => {
-                const cleanSubUri = subUri.startsWith('/') ? subUri.substring(1) : subUri;
-                const subData = await http_resource_retrieve(this.originator, host, port, cleanSubUri, '');
-                return subData['m2m:sub'];
-              })
-            );
-
-            // 성공한 결과만 추가
-            cnt['m2m:sub'] = results
-              .filter(r => r.status === 'fulfilled' && r.value)
-              .map(r => r.value);
-
-            console.log(`      Loaded ${cnt['m2m:sub'].length} SUBs for ${path}`);
-          }
-        } catch (error) {
-          // No SUB found, ignore
-        }
-
-        result.push(cnt);
-      }
-
-      return result;
-    };
-
-    return await buildTree(cleanAeUri);
-  },
-
-  // URI 목록에서 CNT 트리 구조 생성 (virtual 속성 사용)
-  buildCntTreeFromUris(cntUris, aeUri) {
-    const cleanAeUri = aeUri.startsWith('/') ? aeUri.substring(1) : aeUri;
-    const aePathParts = cleanAeUri.split('/');
-
-    // CNT들을 경로별로 그룹화
-    const cntMap = new Map();
-
-    for (const uri of cntUris) {
-      const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
-      const parts = cleanUri.split('/');
-
-      // AE 경로 이후의 부분만 추출
-      const cntPath = parts.slice(aePathParts.length);
-      if (cntPath.length === 0) continue;
-
-      // 각 레벨의 CNT 경로 저장
-      let currentPath = '';
-      for (let i = 0; i < cntPath.length; i++) {
-        const parentPath = currentPath;
-        currentPath = currentPath ? `${currentPath}/${cntPath[i]}` : cntPath[i];
-
-        if (!cntMap.has(currentPath)) {
-          cntMap.set(currentPath, {
-            rn: cntPath[i],
-            ri: `virtual-${currentPath.replace(/\//g, '-')}`,
-            ty: 3,
-            ct: new Date().toISOString().replace(/[-:]/g, '').split('.')[0],
-            lt: new Date().toISOString().replace(/[-:]/g, '').split('.')[0],
-            mni: 1000,
-            parentPath: parentPath,
-            children: []
-          });
-        }
-      }
-    }
-
-    // 트리 구조 생성
-    const rootCnts = [];
-    const pathToNode = new Map();
-
-    // 모든 CNT를 순회하며 부모-자식 관계 설정
-    for (const [path, cnt] of cntMap.entries()) {
-      if (cnt.parentPath === '') {
-        // 루트 레벨 CNT
-        rootCnts.push(cnt);
-        pathToNode.set(path, cnt);
-      } else {
-        // 부모 CNT 찾기
-        const parentCnt = cntMap.get(cnt.parentPath);
-        if (parentCnt) {
-          parentCnt.children.push(cnt);
-          pathToNode.set(path, cnt);
-        }
-      }
-    }
-
-    // children 배열을 m2m:cnt로 변환
-    function convertChildren(cnt) {
-      if (cnt.children && cnt.children.length > 0) {
-        cnt['m2m:cnt'] = cnt.children.map(child => convertChildren(child));
-        delete cnt.children;
-      } else {
-        delete cnt.children;
-      }
-      return cnt;
-    }
-
-    return rootCnts.map(cnt => convertChildren(cnt));
   },
 
   convertNode(node, nodeName, depth = 0, excludeCIN = false) {
@@ -2057,7 +1681,9 @@ async loadResources() {
       const targetPath = resourcePath || target.basePath;
       console.log('[SUBSCRIPTION] Creating or finding subscription on:', targetPath);
 
-      // 1. 먼저 기존 Subscription 찾기 (designToolSub으로 시작하는 것)
+      const expectedMqttNu = `mqtt://${target.host}:1883/designTool`;
+
+      // 1. 기존 designToolSub 중 내 호스트에 맞는 것 찾기 (삭제 안 함)
       try {
         const url = `http://${target.host}:${target.port}/${targetPath}?fu=1&ty=23`;
         console.log('[SUBSCRIPTION] Checking existing subscriptions:', url);
@@ -2076,17 +1702,16 @@ async loadResources() {
           const uriList = result?.['m2m:uril'] || [];
           console.log('[SUBSCRIPTION] Found subscriptions:', uriList);
 
-          // designToolSub으로 시작하는 것 찾기
-          const existingSub = uriList.find(uri => {
+          // 모든 designToolSub 필터링
+          const designToolSubs = uriList.filter(uri => {
             const parts = uri.split('/');
-            const lastName = parts[parts.length - 1];
-            return lastName.startsWith('designToolSub');
+            return parts[parts.length - 1].startsWith('designToolSub');
           });
 
-          if (existingSub) {
-            // 기존 SUB의 nu 확인 (MQTT인지 체크)
+          // 내 호스트에 맞는 sub 찾기
+          for (const subUri of designToolSubs) {
             try {
-              const subUrl = `http://${target.host}:${target.port}/${existingSub}`;
+              const subUrl = `http://${target.host}:${target.port}/${subUri}`;
               const subResponse = await fetch(subUrl, {
                 method: 'GET',
                 headers: {
@@ -2100,40 +1725,21 @@ async loadResources() {
                 const subData = await subResponse.json();
                 const nu = subData?.['m2m:sub']?.nu || [];
 
-                // 올바른 MQTT broker URL 생성 (현재 targetIP 기준)
-                const expectedMqttNu = `mqtt://${target.host}:1883/designTool`;
-
-                // nu 배열에 올바른 MQTT URL이 있는지 확인
-                const hasCorrectMqtt = nu.includes(expectedMqttNu);
-
-                if (hasCorrectMqtt) {
-                  // 올바른 MQTT SUB이면 재사용
-                  const parts = existingSub.split('/');
+                if (nu.includes(expectedMqttNu)) {
+                  // 내 호스트에 맞는 MQTT SUB → 재사용
+                  const parts = subUri.split('/');
                   const subName = parts[parts.length - 1];
                   if (!resourcePath) {
-                    // CSE root subscription만 subscriptionResourceName에 저장
                     this.subscriptionResourceName = subName;
                     this.subscriptionCreated = true;
                   }
                   console.log('[SUBSCRIPTION] ✅ Reusing existing MQTT subscription:', subName, 'at', targetPath);
                   return { success: true, subscriptionName: subName, reused: true };
-                } else {
-                  // 잘못된 SUB이면 삭제 (HTTP이거나 잘못된 MQTT broker URL)
-                  const oldType = nu.some(url => url.startsWith('mqtt://')) ? 'old MQTT broker' : 'HTTP';
-                  console.log(`[SUBSCRIPTION] ⚠️ Found ${oldType} subscription, deleting:`, existingSub);
-                  console.log(`[SUBSCRIPTION] Expected: ${expectedMqttNu}, Got: ${nu[0]}`);
-                  await fetch(subUrl, {
-                    method: 'DELETE',
-                    headers: {
-                      'X-M2M-Origin': this.originator,
-                      'X-M2M-RVI': '2a'
-                    }
-                  });
-                  console.log('[SUBSCRIPTION] ✅ Old subscription deleted');
                 }
+                // 다른 호스트의 sub은 건드리지 않고 스킵
               }
             } catch (error) {
-              console.log('[SUBSCRIPTION] Error checking existing sub:', error);
+              console.log('[SUBSCRIPTION] Error checking sub:', subUri, error);
             }
           }
         }
@@ -2141,7 +1747,7 @@ async loadResources() {
         console.log('[SUBSCRIPTION] No existing subscription found, will create new one');
       }
 
-      // 2. 기존 SUB가 없으면 새로 생성
+      // 2. 일치하는 게 없으면 새로 생성 (기존 sub 삭제 안 함)
       const subscriptionName = 'designToolSub_' + Date.now();
 
       // targetIP에서 호스트 추출하여 MQTT nu 생성

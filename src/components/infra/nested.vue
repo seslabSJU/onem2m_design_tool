@@ -44,14 +44,28 @@
             {{ element.childCount }}
           </span>
 
-          <!-- AE 확대 보기 버튼: AE(ty=2)이면서 서버에서 로드한 경우, 확대 뷰가 아닐 때만 -->
+          <!-- AE 확대 보기 + CSE 직속 CNT/FCNT만 확대 보기 -->
           <button
-            v-if="element.ty === 2 && element.createdOnServer && this.group.name !== 'zoomTree'"
+            v-if="(element.ty === 2 || ((element.ty === 3 || element.ty === 28) && element.cseDirectChild)) && element.createdOnServer && this.group.name !== 'zoomTree'"
             class="zoomBtn"
             @click.stop="$emit('zoom-view', element)"
             title="Expand View"
           >
             🔍
+          </button>
+
+          <!-- 줌뷰 내 CNT/FCNT에서 전체 인스턴스 로드 버튼 -->
+          <button
+            v-if="(element.ty === 3 || element.ty === 28)
+              && element.createdOnServer
+              && element.instancesLoaded
+              && !element.instancesLoadedAll
+              && this.group.name === 'zoomTree'"
+            class="loadAllBtn"
+            @click.stop="$emit('load-all-instances', element)"
+            title="Load All Instances"
+          >
+            ▼ All
           </button>
         </div>
 
@@ -64,6 +78,7 @@
           @drag-start="(evt) => { $emit('drag-start', evt) }"
           @toggle-expand="(element, side) => { $emit('toggle-expand', element, side) }"
           @zoom-view="(element) => { $emit('zoom-view', element) }"
+          @load-all-instances="(element) => { $emit('load-all-instances', element) }"
           :childRT="getChildRT(element.ty)"
           :nestTree="true"
         />
@@ -413,6 +428,34 @@ export default {
   background: #f0f0f0;
   border-radius: 10px;
   display: inline-block;
+}
+
+.loadAllBtn {
+  background: linear-gradient(145deg, #FF9800, #e68900);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
+
+.loadAllBtn:hover {
+  background: linear-gradient(145deg, #FFB74D, #FF9800);
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.loadAllBtn:active {
+  transform: scale(0.95);
 }
 
 .zoomBtn {
