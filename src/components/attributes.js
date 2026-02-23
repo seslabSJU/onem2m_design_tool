@@ -318,11 +318,11 @@ export const resourceAttributes = {
     
     3: {
         'rn': {
-            type: "text", 
+            type: "text",
             fullName: "Resource Name",
             description: "The name of the resource",
-            required:false, 
-            disable: false, 
+            required:false,
+            disable: false,
             value: ''
         },
         'lbl': {
@@ -505,6 +505,18 @@ export const resourceAttributes = {
                 return true;
             }
         },
+        'mnm': {
+            type: "Number",
+            fullName: "Max Nr of Members",
+            description: "The maximum number of members in the group",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) {
+                if (value < 0) return false;
+                return true;
+            }
+        },
         'mid':{
             type: "Array",
             fullName: "Member ID",
@@ -612,31 +624,36 @@ export const resourceAttributes = {
             disable: false, 
             value: false
         },
-        // 'net':{
-        //     type: "Select",
-        //     fullName: "Notification Event Type",
-        //     description: "The notification event type of the resource",
-        //     options: {
-        //         1: 'Update of resource',
-        //         2: 'Delete of resource',
-        //         3: 'Create of Direct Child resource',
-        //         4: 'Delete of Direct Child resource',
-        //         5: 'Retrieve of Container resource with no child resource',
-        //         6: 'Trigger Received For AE Resource',
-        //         7: 'Blocking Update',
-        //         8: 'Report on missing data points'
-        //     },
-        //     required: true,
-        //     disable: false,
-        //     value: 0
-        // },
+        'net':{
+            type: "Checkbox",
+            fullName: "Notification Event Type",
+            description: "Select notification event types (enc.net)",
+            options: {
+                1: 'Update of resource',
+                2: 'Delete of resource',
+                3: 'Create of Direct Child resource',
+                4: 'Delete of Direct Child resource',
+                5: 'Retrieve of Container with no child',
+                6: 'Trigger Received For AE',
+                7: 'Blocking Update',
+                8: 'Report on missing data points'
+            },
+            required: false,
+            disable: false,
+            dataType: 'Number',
+            value: []
+        },
         'exc': {
-            type: "Boolean", 
+            type: "Number",
             fullName: "Expiration Counter",
-            description: "Set whether the resource has expiration counter",
-            required:false, 
-            disable: false, 
-            value: false
+            description: "The number of times the subscription can be used before expiring",
+            required:false,
+            disable: false,
+            value: 0,
+            validation: function (value) {
+                if (value < 0) return false;
+                return true;
+            }
         },
         'nu': {
             type: "Array", 
@@ -755,6 +772,14 @@ export const resourceAttributes = {
                 if (value < 0) return false;
                 return true;
             }
+        },
+        'fcied': {
+            type: "Boolean",
+            fullName: "FCIN Enabled",
+            description: "When true, each UPDATE creates a new FlexContainerInstance snapshot",
+            required: false,
+            disable: false,
+            value: false
         },
         'cr': {
             type: "Boolean",
@@ -891,19 +916,20 @@ export const tinyIoTPresets = {
   },
   1: { // ACP
     rn: 'myACP',
-    pv: [{ acor: ['CAdmin'], acop: 63 }],
-    pvs: [{ acor: ['CAdmin'], acop: 63 }]
+    pv: [{ acor: ['CAdmin'], acop: 61 }],
+    pvs: [{ acor: ['CAdmin'], acop: 63 }, { acor: ['all'], acop: 7 }]
   },
   9: { // GRP
     rn: 'myGRP', mnm: 10, mt: 2, csy: 3
   },
   23: { // SUB
-    rn: 'mySUB', nu: [''], exc: 10, nct: 1
+    rn: 'mySUB', net: [3, 4], nu: [''], exc: 10, nct: 1
   },
   28: { // FCNT
     rn: 'myFCNT',
     cnd: 'org.onem2m.common.moduleclass.temperature',
-    mni: 10, mbs: 16384
+    fcied: true, mni: 10, mbs: 16384, mia: 86400,
+    curT0: 25.5
   },
   58: { // FCIN — 자동 생성이라 프리셋 없음
   }

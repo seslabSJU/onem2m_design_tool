@@ -48,7 +48,7 @@
         </div>
         <form @submit="validate" id="attrForm">
             <div class="attrBox">
-                <div v-for="(content, key) in selectedElement" class="attrRow" :key="key">
+                <div v-for="(content, key) in selectedElement" class="attrRow" :key="key" :class="{ customRow: isCustomAttr(content) }">
                     <div class="col-3 key">
                         <p class="fullName">
                             {{ content.fullName }}
@@ -66,7 +66,7 @@
                         <div v-if="content.type=='Array'" class="arrayInput">
                             <ArrayInput
                             :content="content"
-                            @input="(value) => { 
+                            @input="(value) => {
                                 if(value.length > 0) isModified = true;
                                 content.value=value;
                                 }"
@@ -75,9 +75,9 @@
                         </div>
                         <div v-if="content.type=='Checkbox'" class="CheckboxInput">
                             <div v-for="option, optkey in content.options" class="Checkbox" :key="optkey">
-                                <input type="checkbox" v-model="content.value" :key="idx" :value="optkey" @input="isModified=true">
+                                <input type="checkbox" v-model="content.value" :key="optkey" :value="optkey" @input="isModified=true">
                                 <span>
-                                    {{ option }} 
+                                    {{ option }}
                                 </span>
                             </div>
                         </div>
@@ -86,17 +86,35 @@
                                 <p>set ACR</p>
                             </div>
                         </div>
-                        <input v-if="content.type == 'text' || content.type == 'Number'" 
-                        :name="key" 
-                        :type="content.type" 
+                        <input v-if="content.type == 'text' || content.type == 'Number'"
+                        :name="key"
+                        :type="content.type"
                         :placeholder="content.placeholder"
-                        :disabled="content.disable" 
-                        v-model="content.value" 
+                        :disabled="content.disable"
+                        v-model="content.value"
                         :required="content.required"
                         autocomplete="off"
                         @input="isModified=true"
                         @keydown.enter.prevent=""
                         />
+                    </div>
+                    <div v-if="isCustomAttr(content)" class="removeCustomBtn" @click="removeCustomAttr(key)" title="Remove">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M11 3L3 11M3 3l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    </div>
+                </div>
+                <!-- FCNT/FCIN: 커스텀 속성 구분선 -->
+                <div v-if="(element.ty === 28 || element.ty === 58) && hasCustomAttrs" class="customSectionLabel" key="__customLabel__">
+                    <span>Custom Attributes (SDT)</span>
+                </div>
+                <!-- FCNT/FCIN: 커스텀 속성 추가 (속성 리스트 안) -->
+                <div v-if="element.ty === 28 || element.ty === 58" class="attrRow addRow" key="__addCustom__">
+                    <div class="addRowInner">
+                        <input type="text" v-model="newCustomKey" placeholder="Attribute name" class="addInput addInputName" @keydown.enter.prevent="addCustomAttr" />
+                        <input type="text" v-model="newCustomValue" placeholder="Value" class="addInput addInputValue" @keydown.enter.prevent="addCustomAttr" />
+                        <button type="button" class="addCustomBtn" @click="addCustomAttr" title="Add Attribute">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span>Add</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -136,8 +154,10 @@ export default {
     },
     data() {
         return {
-            selectedElement:  {}, 
+            selectedElement:  {},
             isModified: false,
+            newCustomKey: '',
+            newCustomValue: '',
             modalData: {
                 status: false,
                 type: '',
@@ -179,6 +199,19 @@ export default {
                 Object.entries(preset).forEach(([key, val]) => {
                     if (this.selectedElement[key]) {
                         this.selectedElement[key].value = cloneDeep(val);
+                    } else {
+                        // 스키마에 없는 커스텀 속성 (SDT 등) 동적 추가
+                        this.selectedElement[key] = {
+                            type: Array.isArray(val) ? "Array"
+                                : typeof val === 'number' ? "Number"
+                                : typeof val === 'boolean' ? "Boolean"
+                                : "text",
+                            fullName: key + " (custom)",
+                            description: "SDT custom attribute",
+                            required: false,
+                            disable: false,
+                            value: cloneDeep(val)
+                        };
                     }
                 });
             }
@@ -227,6 +260,11 @@ export default {
             this.setoriginator.setoriginator.value = storedOriginator;
         }
     },
+    computed: {
+        hasCustomAttrs() {
+            return Object.values(this.selectedElement).some(c => this.isCustomAttr(c));
+        }
+    },
     methods: {
         validate(evt) {
             evt.preventDefault();
@@ -251,9 +289,8 @@ export default {
 
             if(this.selectedElement.rn && this.selectedElement.rn.value) {
                 this.$emit('update-rn', { id: this.element.id, rn: this.selectedElement.rn.value });
-                //alert("Changes saved successfully");
-                this.$emit('close');
             }
+            this.$emit('close');
         },
         confirmClose() {
             if(this.isModified) {
@@ -263,6 +300,51 @@ export default {
             } else {
                 this.$emit('close', null);
             }
+        },
+        addCustomAttr() {
+            const key = this.newCustomKey.trim();
+            const val = this.newCustomValue.trim();
+            if (!key) {
+                alert('Attribute name을 입력하세요.');
+                return;
+            }
+            if (this.selectedElement[key]) {
+                alert(`'${key}' 속성이 이미 존재합니다.`);
+                return;
+            }
+            // 숫자면 Number로 변환
+            let parsedVal = val;
+            let fieldType = 'text';
+            if (val === 'true' || val === 'false') {
+                parsedVal = val === 'true';
+                fieldType = 'Boolean';
+            } else if (val !== '' && !isNaN(Number(val))) {
+                parsedVal = Number(val);
+                fieldType = 'Number';
+            }
+            // Vue 3 반응성 보장: 새 객체로 교체하여 v-for 재렌더링
+            this.selectedElement = Object.assign({}, this.selectedElement, {
+                [key]: {
+                    type: fieldType,
+                    fullName: key + ' (custom)',
+                    description: 'SDT custom attribute',
+                    required: false,
+                    disable: false,
+                    value: parsedVal
+                }
+            });
+            this.isModified = true;
+            this.newCustomKey = '';
+            this.newCustomValue = '';
+        },
+        isCustomAttr(content) {
+            return content.description === 'SDT custom attribute' || content.description === 'Custom attribute';
+        },
+        removeCustomAttr(key) {
+            const copy = Object.assign({}, this.selectedElement);
+            delete copy[key];
+            this.selectedElement = copy;
+            this.isModified = true;
         },
         submitOriginator() {
             if (this.setoriginator.setoriginator.validation(this.setoriginator.setoriginator.value)) {
@@ -473,5 +555,110 @@ export default {
 .zoomBtn:active {
     transform: scale(0.95);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Custom Attribute Rows --- */
+.customRow {
+    background: linear-gradient(90deg, #eef4ff 0%, #f8faff 100%);
+    border-left: 3px solid #667eea;
+    padding-left: 8px !important;
+}
+
+.removeCustomBtn {
+    cursor: pointer;
+    color: #bbb;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.removeCustomBtn:hover {
+    color: #fff;
+    background-color: #e74c3c;
+}
+
+/* --- Custom Section Label --- */
+.customSectionLabel {
+    padding: 6px 12px;
+    background: linear-gradient(90deg, #667eea20, transparent);
+    border-top: 1px solid #dde4f0;
+    border-bottom: 1px solid #dde4f0;
+}
+
+.customSectionLabel span {
+    font-size: 11px;
+    font-weight: 600;
+    color: #667eea;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* --- Add Row --- */
+.addRow {
+    border-top: none !important;
+    border-bottom: none !important;
+    padding: 8px 5px !important;
+    background: #f8f9fb;
+}
+
+.addRowInner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.addInput {
+    padding: 7px 12px;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+.addInput:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+.addInputName {
+    flex: 1;
+}
+
+.addInputValue {
+    flex: 1.5;
+}
+
+.addCustomBtn {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.addCustomBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.addCustomBtn:active {
+    transform: translateY(0);
 }
 </style>

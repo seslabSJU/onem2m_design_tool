@@ -28,6 +28,38 @@
               <span class="toggle-slider-large"></span>
             </label>
           </div>
+
+          <!-- HTTP Headers 섹션 (리소스별) -->
+          <div class="settings-divider">HTTP Headers</div>
+
+          <div class="header-table-wrap">
+            <table class="header-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Origin</th>
+                  <th>RVI</th>
+                  <th>RI</th>
+                  <th>Accept</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="rt in headerResourceTypes" :key="rt.ty">
+                  <td class="header-td-name">{{ rt.name }}</td>
+                  <td><input type="text" v-model="resourceHeaders[rt.ty].origin" @input="onHeaderChange" class="header-input header-input-origin" /></td>
+                  <td>
+                    <select v-model="resourceHeaders[rt.ty].rvi" @change="onHeaderChange" class="header-select">
+                      <option value="2a">2a</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </td>
+                  <td><input type="text" v-model="resourceHeaders[rt.ty].ri" @input="onHeaderChange" class="header-input header-input-ri" /></td>
+                  <td><input type="text" v-model="resourceHeaders[rt.ty].accept" @input="onHeaderChange" class="header-input header-input-accept" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </navBar>
@@ -326,6 +358,27 @@ export default {
       flashingEffectEnabled: true,  // 번쩍이는 효과 토글 (기본값: 켜짐)
       csePreset: 'none',           // CSE 프리셋 ('none' | 'tinyiot')
       showSettings: false,         // 설정 패널 표시 여부
+      // 리소스 타입별 HTTP 헤더 (명세서 기준 기본값)
+      resourceHeaders: {
+        1:  { origin: 'CAdmin', rvi: '3',  ri: 'create_acp',  accept: 'application/json' },
+        2:  { origin: 'CAdmin', rvi: '2a', ri: 'create_ae',   accept: 'application/vnd.onem2m-res+json;ty=2' },
+        3:  { origin: 'CAdmin', rvi: '3',  ri: 'create_cnt',  accept: 'application/json' },
+        4:  { origin: 'CAdmin', rvi: '2a', ri: 'create_cin',  accept: 'application/json' },
+        9:  { origin: 'CAdmin', rvi: '3',  ri: 'create_grp',  accept: 'application/json' },
+        23: { origin: 'CAdmin', rvi: '3',  ri: 'create_sub',  accept: 'application/json' },
+        28: { origin: 'CAdmin', rvi: '4',  ri: 'create_fcnt', accept: 'application/json' },
+        58: { origin: 'CAdmin', rvi: '4',  ri: 'create_fcin', accept: 'application/json' },
+      },
+      headerResourceTypes: [
+        { ty: 1, name: 'ACP' },
+        { ty: 2, name: 'AE' },
+        { ty: 3, name: 'CNT' },
+        { ty: 4, name: 'CIN' },
+        { ty: 9, name: 'GRP' },
+        { ty: 23, name: 'SUB' },
+        { ty: 28, name: 'FCNT' },
+        { ty: 58, name: 'FCIN' },
+      ],
       mqttTopic: '/oneM2M/req/tinyiot/designTool',  // oneM2M 표준 형식 (맨 앞 /  필수!)
       // 확대 뷰 관련
       showZoomView: false,
@@ -359,6 +412,24 @@ export default {
     if (savedPreset) this.csePreset = savedPreset;
     const savedFlash = localStorage.getItem('flashingEffectEnabled');
     if (savedFlash !== null) this.flashingEffectEnabled = savedFlash === 'true';
+
+    // 리소스별 HTTP 헤더 설정값 복원
+    const savedHeaders = localStorage.getItem('resourceHeaders');
+    if (savedHeaders) {
+      try {
+        const parsed = JSON.parse(savedHeaders);
+        for (const ty in parsed) {
+          if (this.resourceHeaders[ty]) {
+            this.resourceHeaders[ty] = { ...this.resourceHeaders[ty], ...parsed[ty] };
+          }
+        }
+      } catch (e) { /* 이전 형식 무시 */ }
+    }
+    // 항상 최신 기본값을 localStorage에 저장 (http-request.js에서 읽을 수 있도록)
+    localStorage.setItem('resourceHeaders', JSON.stringify(this.resourceHeaders));
+    // originator는 setAttrs.vue에서 localStorage에 저장됨 — 복원하여 동기화
+    const savedOriginator = localStorage.getItem('originator');
+    if (savedOriginator) this.originator = savedOriginator;
   },
 
   mounted() {
@@ -381,6 +452,10 @@ export default {
 
     onFlashEffectToggle() {
       localStorage.setItem('flashingEffectEnabled', String(this.flashingEffectEnabled));
+    },
+
+    onHeaderChange() {
+      localStorage.setItem('resourceHeaders', JSON.stringify(this.resourceHeaders));
     },
 
     saveResourceTree(){ // 리소스트리 텍스트파일로 저장할때 실행되는 곳
@@ -2811,6 +2886,9 @@ async loadResources() {
         this.isDragging=false;
         sessionStorage.setItem("CSE1",JSON.stringify(this.cse1, null, 2));
       }
+    },
+    originator(newVal) {
+      localStorage.setItem('originator', newVal);
     }
   },
 
@@ -3248,7 +3326,7 @@ async loadResources() {
   border: 1px solid #0d1829;
   border-radius: 12px;
   padding: 14px 18px;
-  min-width: 240px;
+  min-width: 580px;
   z-index: 9999;
   box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.4), -4px -4px 12px rgba(255, 255, 255, 0.05);
 }
@@ -3291,6 +3369,115 @@ async loadResources() {
 }
 
 .settings-select option {
+  background: #1e3a5f;
+  color: white;
+}
+
+.settings-divider {
+  color: #aaa;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 12px 0 10px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+.settings-input {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  width: 130px;
+  outline: none;
+}
+
+.settings-input:focus {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.settings-hint {
+  color: #888;
+  font-size: 10px;
+  margin: -6px 0 8px;
+}
+
+/* 리소스별 헤더 풀 테이블 */
+.header-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 4px;
+}
+
+.header-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.header-table thead th {
+  color: #aaa;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 3px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+}
+
+.header-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.header-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.header-td-name {
+  color: white;
+  font-weight: 500;
+  font-size: 12px;
+  padding: 3px 4px 3px 0;
+  white-space: nowrap;
+}
+
+.header-input {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 3px 5px;
+  font-size: 11px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.header-input:focus {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.header-input-origin { min-width: 60px; }
+.header-input-ri { min-width: 70px; }
+.header-input-accept { min-width: 100px; }
+
+.header-select {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 3px 2px;
+  font-size: 11px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.header-select option {
   background: #1e3a5f;
   color: white;
 }

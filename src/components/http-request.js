@@ -29,32 +29,9 @@ async function select_resource(attr)
   const acp_header = ["ty"];
   const sub_header = ["ty"];
 
-  var attribute_list = [];
-  if (attr["ty"] == 1)
-  {
-    attribute_list = acp_header;
-    attr_list["type"] = "acp";
-  }
-  else if (attr["ty"] == 2)
-  {
-    attribute_list = ae_header;
-    attr_list["type"] = "ae";
-  }
-  else if (attr["ty"] == 3)
-  {
-    attribute_list = cnt_header;
-    attr_list["type"] = "cnt";
-  }
-  else if (attr["ty"] == 9)
-  {
-    attribute_list = grp_header;
-    attr_list["type"] = "grp";
-  }
-  else
-  {
-    attribute_list = sub_header;
-    attr_list["type"] = "sub";
-  }
+  var attribute_list = ["ty", "rvi"];
+  const typeMap = { 1: "acp", 2: "ae", 3: "cnt", 4: "cin", 9: "grp", 23: "sub", 28: "fcnt", 58: "fcin" };
+  attr_list["type"] = typeMap[attr["ty"]] || "unknown";
 
   // console.log("att list check");
   // console.log(attribute_list);
@@ -83,74 +60,64 @@ async function select_resource(attr)
 async function create_resource(attr, path, targetIP)
 { 
   
-  // setAttrs에서 입력받은 originator를 originator로 셋팅
-  const originator = localStorage.getItem('originator');
-  console.log(`Received originator: ${originator}`); 
-
-
-  // console.log(path);
-  // console.log("create_resource : ", targetIP); 
-  targetIP = targetIP.replace(/\/[^/]*$/, ''); 
+  targetIP = targetIP.replace(/\/[^/]*$/, '');
   let result = path.replace(/\/[^/]*$/, '');
-  // console.log("path : ", result);
-    // console.log("hello im free");
     const url = `${targetIP}${result}`;
     console.log("now request url", url);
     var attrs = {};
 
     attrs = await select_resource(attr);
     var now_type = attrs["type"];
-    // var resource_type = `m2m:${now_type}`;
-    // console.log("------");
-    // console.log(select_resource(attr));
-    // console.log("------");
- 
 
-    
+    // localStorage에서 리소스별 헤더 설정값 읽기
+    const ty = attrs["header"]["ty"];
+    let resHeaders = {};
+    try { resHeaders = JSON.parse(localStorage.getItem('resourceHeaders') || '{}'); } catch (e) {}
+    const h = resHeaders[ty] || {};
+
+    const origin = h.origin || localStorage.getItem('originator') || 'CAdmin';
+    const rvi = h.rvi || '2a';
+    const ri = h.ri || '12345';
+    const accept = h.accept || 'application/json';
+
     let headers = {
-        'X-M2M-Origin': originator, // originator가 계속 변하게 하려면, 하드 코딩 하듯이
-        "Accept" : "application/json",
-        'Content-Type': `application/json;ty=${attrs["header"]["ty"]}`,
-        // 'Cache-Control': 'no-cache',
-        //'Access-Control-Allow-Origin' : '*',
-        "X-M2M-RVI" : "2a",
-        "X-M2M-RI" : 12345
+        'X-M2M-Origin': origin,
+        'Accept': accept,
+        'Content-Type': `application/json;ty=${ty}`,
+        'X-M2M-RVI': rvi,
+        'X-M2M-RI': ri
     }
+
+    console.log(`Received originator: ${origin}`);
 
   
 
 
     var body_attr = {}
 
-    if (now_type == "acp")
-    {
-      body_attr = {"m2m:acp" : attrs["body"]}
-    }
-
-    else if (now_type == "ae")
-    {
-      body_attr = {
-        "m2m:ae" : attrs["body"],
-        // "originator" : "Coriginertest",
-      } // 수정한 부분
-    }
-    else if (now_type == "cnt")
-    {
-      body_attr = {"m2m:cnt" : attrs["body"]}
-    }
-
-    else if (now_type == "grp")
-    {
-      body_attr = {"m2m:grp" : attrs["body"]}
-    }
-    else if (now_type == "sub")
-    {
-      body_attr = {"m2m:sub" : attrs["body"]}
-    }
-    else
-    {
+    if (now_type === "unknown") {
+      console.error("Unknown resource type:", attrs["header"]["ty"]);
       return;
     }
+
+    // FCNT: cnd 기반 body 키 사용 (예: org.onem2m.common.moduleclass.temperature → cod:tempe)
+    let bodyKey;
+    if (now_type === "fcnt" && attrs["body"]["cnd"]) {
+      const cndParts = attrs["body"]["cnd"].split(".");
+      const shortName = cndParts[cndParts.length - 1];
+      // oneM2M SDT 약어: temperature→tempe, binarySwitch→binSh 등 (5글자로 축약)
+      const abbr = shortName.length > 5 ? shortName.substring(0, 5) : shortName;
+      bodyKey = `cod:${abbr}`;
+    } else {
+      bodyKey = `m2m:${now_type}`;
+    }
+    // SUB: net 속성을 enc.net으로 감싸기 (oneM2M 명세 구조)
+    if (now_type === "sub" && attrs["body"]["net"]) {
+      attrs["body"]["enc"] = { "net": attrs["body"]["net"] };
+      delete attrs["body"]["net"];
+    }
+
+    body_attr = { [bodyKey]: attrs["body"] };
 
     console.log("body attrs", body_attr);
     
