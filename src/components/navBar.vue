@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div style="overflow: visible;">
       <!-- Navbar -->
       <nav class="component-navbar">
         <div class="col-8 title">
@@ -8,11 +8,13 @@
                 oneM2M Data Model Design Tool
             </p>
         </div>
-        <ul>
-          <li><a href="https://github.com/seslabSJU/onem2m_design_tool" target="_blank">GitHub</a></li>
-          <li><a href="https://onem2m.org" target="_blank">about oneM2M</a></li>
-          <!-- <li><a href="#">Contact</a></li> -->
-        </ul>
+        <div class="navbar-right">
+          <ul>
+            <li><a href="https://github.com/seslabSJU/onem2m_design_tool" target="_blank">GitHub</a></li>
+            <li><a href="https://onem2m.org" target="_blank">about oneM2M</a></li>
+          </ul>
+          <slot></slot>
+        </div>
       </nav>
       <!-- The rest of your component's content -->
     </div>
@@ -38,6 +40,7 @@
   border-right: 1px solid rgba(0, 0, 0, 0.05);
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   position: relative;
+  overflow: visible;
   backdrop-filter: blur(10px);
 }
 
@@ -56,10 +59,16 @@
   display: inline; /* Make the title appear inline */
 }
 
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .component-navbar ul {
-  float: right; /* Float the list to the right */
-  align-items: center; /* Center-align list items */
-  list-style-type: none; /* Remove the bullet points for the list */
+  float: right;
+  align-items: center;
+  list-style-type: none;
   display: inline-box;
   padding: 15px;
   margin: 0px;

@@ -32,10 +32,18 @@
                     <button @click="submitOriginator" style="margin-left: 10px;">Submit</button>
                 </div>
             </div>
-            <div class="closeBtn" @click="confirmClose">
-                <svg width="25px" height="25px" version="1.0" id="katman_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 1436 1054" style="enable-background:new 0 0 1436 1054;" xml:space="preserve">
-                    <path d="M718.5,453.8l224-224.3c20.4-20.4,53.3-20.4,73.6,0c20.4,20.4,20.4,53.3,0,73.6l-224,224.6l224,224c20.4,20.4,20.4,53.3,0,73.6c-20.4,20.4-53.3,20.4-73.6,0l-224-224l-224.6,224c-20.4,20.4-53.3,20.4-73.6,0c-20.4-20.4-20.4-53.3,0-73.6l224-224L420.4,303.2c-20.5-20.4-20.5-53.3-0.1-73.6s53.3-20.4,73.6,0l224.6,224V453.8z"/>
-                </svg>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button
+                    v-if="element.ty === 2 || element.ty === 3 || element.ty === 28"
+                    class="zoomBtn"
+                    @click="$emit('zoom-view', element)"
+                    title="Expanded View"
+                >🔍</button>
+                <div class="closeBtn" @click="confirmClose">
+                    <svg width="25px" height="25px" version="1.0" id="katman_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 1436 1054" style="enable-background:new 0 0 1436 1054;" xml:space="preserve">
+                        <path d="M718.5,453.8l224-224.3c20.4-20.4,53.3-20.4,73.6,0c20.4,20.4,20.4,53.3,0,73.6l-224,224.6l224,224c20.4,20.4,20.4,53.3,0,73.6c-20.4,20.4-53.3,20.4-73.6,0l-224-224l-224.6,224c-20.4,20.4-53.3,20.4-73.6,0c-20.4-20.4-20.4-53.3,0-73.6l224-224L420.4,303.2c-20.5-20.4-20.5-53.3-0.1-73.6s53.3-20.4,73.6,0l224.6,224V453.8z"/>
+                    </svg>
+                </div>
             </div>
         </div>
         <form @submit="validate" id="attrForm">
@@ -105,12 +113,12 @@
 import loadFromRemote from "@/components/loadFromRemote.vue";
 import setAcr from "./setAcr.vue";
 import ArrayInput from "./ArrayInput.vue";
-import { resourceAttributes, resourceType as RT } from "@/components/attributes.js";
+import { resourceAttributes, resourceType as RT, tinyIoTPresets } from "@/components/attributes.js";
 import { cloneDeep } from 'lodash';
 
 export default {
     name: "setAttrs",
-    emits: ["close", "save", "modified", "update-rn"],
+    emits: ["close", "save", "modified", "update-rn", "zoom-view"],
     components: {
         loadFromRemote,
         setAcr,
@@ -120,6 +128,10 @@ export default {
         element: {
             type: Object,
             required: true,
+        },
+        csePreset: {
+            type: String,
+            default: 'none',
         },
     },
     data() {
@@ -152,12 +164,63 @@ export default {
         window.addEventListener('beforeunload', () => { this.$emit('close', null); });
     },
     mounted() {
-        this.selectedElement = cloneDeep(resourceAttributes[this.element.ty]); 
+        this.selectedElement = cloneDeep(resourceAttributes[this.element.ty]);
         Object.entries(this.element.attrs).forEach(([key, value]) => {
             if(this.selectedElement[key]) {
                 this.selectedElement[key].value = value;
             }
         });
+
+        // TinyIoT 프리셋 적용: attrs가 비어있는 새 리소스에만 적용
+        const hasUserAttrs = Object.keys(this.element.attrs).some(k => k !== 'ty');
+        if (!hasUserAttrs && this.csePreset === 'tinyiot') {
+            const preset = tinyIoTPresets[this.element.ty];
+            if (preset) {
+                Object.entries(preset).forEach(([key, val]) => {
+                    if (this.selectedElement[key]) {
+                        this.selectedElement[key].value = cloneDeep(val);
+                    }
+                });
+            }
+        }
+
+        // FCNT/FCIN의 경우 SDT 커스텀 속성을 동적으로 추가 (스키마에 없는 속성)
+        if (this.element.ty === 28 || this.element.ty === 58) {
+            Object.entries(this.element.attrs).forEach(([key, value]) => {
+                if (!this.selectedElement[key]) {
+                    // custom_attrs가 객체면 펼쳐서 개별 속성으로 추가
+                    if (key === 'custom_attrs' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                        Object.entries(value).forEach(([cKey, cVal]) => {
+                            if (!this.selectedElement[cKey]) {
+                                this.selectedElement[cKey] = {
+                                    type: Array.isArray(cVal) ? "Array"
+                                        : typeof cVal === 'number' ? "Number"
+                                        : typeof cVal === 'boolean' ? "Boolean"
+                                        : "text",
+                                    fullName: cKey + " (custom)",
+                                    description: "SDT custom attribute",
+                                    required: false,
+                                    disable: false,
+                                    value: cVal
+                                };
+                            }
+                        });
+                    } else {
+                        this.selectedElement[key] = {
+                            type: Array.isArray(value) ? "Array"
+                                : typeof value === 'number' ? "Number"
+                                : typeof value === 'boolean' ? "Boolean"
+                                : "text",
+                            fullName: key,
+                            description: "Custom attribute",
+                            required: false,
+                            disable: false,
+                            value: value
+                        };
+                    }
+                }
+            });
+        }
 
         const storedOriginator = localStorage.getItem('originator');
         if (storedOriginator) {
@@ -382,5 +445,33 @@ export default {
 .btn p {
     padding: 0;
     margin: 0;
+}
+
+.zoomBtn {
+    background: linear-gradient(145deg, #4374D9, #2a5bb8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.zoomBtn:hover {
+    background: linear-gradient(145deg, #5a8aea, #3a6bc8);
+    transform: scale(1.15);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.zoomBtn:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 </style>

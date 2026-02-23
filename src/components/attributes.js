@@ -877,6 +877,38 @@ export const resourceAttributes = {
     },
 };
 
+// TinyIoT 프리셋: Postman 컬렉션 기준 기본값
+export const tinyIoTPresets = {
+  2: { // AE
+    rn: 'myAE', api: 'Nmyapp3', lbl: ['key1', 'key2'],
+    srv: ['3'], rr: true
+  },
+  3: { // CNT
+    rn: 'myCNT', lbl: ['key1', 'key2'], mbs: 16384
+  },
+  4: { // CIN
+    con: '12345', lbl: ['lnl1']
+  },
+  1: { // ACP
+    rn: 'myACP',
+    pv: [{ acor: ['CAdmin'], acop: 63 }],
+    pvs: [{ acor: ['CAdmin'], acop: 63 }]
+  },
+  9: { // GRP
+    rn: 'myGRP', mnm: 10, mt: 2, csy: 3
+  },
+  23: { // SUB
+    rn: 'mySUB', nu: [''], exc: 10, nct: 1
+  },
+  28: { // FCNT
+    rn: 'myFCNT',
+    cnd: 'org.onem2m.common.moduleclass.temperature',
+    mni: 10, mbs: 16384
+  },
+  58: { // FCIN — 자동 생성이라 프리셋 없음
+  }
+};
+
 
 // aei 값을 업데이트하는 함수를 추가
 export function updateaeiValue(newaei) {

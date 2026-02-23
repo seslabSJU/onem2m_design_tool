@@ -1,6 +1,36 @@
 <template>
   <header>
-    <navBar class="nav" />
+    <navBar class="nav">
+      <!-- 설정(톱니바퀴) 아이콘 — 타이틀 바 -->
+      <div class="settings-wrapper">
+        <span
+          class="settings-gear"
+          @click="showSettings = !showSettings"
+          title="Settings"
+        >⚙️</span>
+
+        <!-- 설정 드롭다운 패널 -->
+        <div v-if="showSettings" class="settings-panel">
+          <div class="settings-panel-title">Settings</div>
+
+          <div class="settings-row">
+            <span class="settings-label">CSE Platform</span>
+            <select v-model="csePreset" @change="onCsePresetChange" class="settings-select">
+              <option value="none">None</option>
+              <option value="tinyiot">TinyIoT</option>
+            </select>
+          </div>
+
+          <div class="settings-row">
+            <span class="settings-label">Flash Effect</span>
+            <label class="toggle-switch-large">
+              <input type="checkbox" v-model="flashingEffectEnabled" @change="onFlashEffectToggle" />
+              <span class="toggle-slider-large"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </navBar>
   </header>
   <div class="configure">
     <div class="box" style = "borderRadius: 10px">
@@ -42,14 +72,6 @@
         {{ realtimeSyncEnabled ? 'Live Sync ON' : 'Live Sync OFF' }}
       </div>
 
-      <!-- 번쩍이는 효과 토글 -->
-      <div style="display: inline-flex; align-items: center; margin-left: 10px; padding: 5px 10px; border-radius: 12px; background: rgba(30, 58, 95, 0.3);">
-        <span style="color: white; margin-right: 10px; font-size: 14px; font-weight: 500;">Flash Effect</span>
-        <label class="toggle-switch-large">
-          <input type="checkbox" v-model="flashingEffectEnabled" @change="onFlashEffectToggle" />
-          <span class="toggle-slider-large"></span>
-        </label>
-      </div>
     </div>
   </div>
   <div class="body">
@@ -157,8 +179,9 @@
       <div class="overlay"> 
       </div>
       <div class="modalBody">
-        <setAttrs 
-        :element="selectedElement" 
+        <setAttrs
+        :element="selectedElement"
+        :cse-preset="csePreset"
         @modified="(status) => { this.attrSettingModified = status; }"
         @close="() => { 
           this.attrSetting = false; 
@@ -170,27 +193,29 @@
         @save="(newElement, callback) => {
           this.attrSettingModified = false;
           Object.entries(newElement).forEach(([key, value]) => {
-            if(value.value.length == 0)
-            return;
-          
-          if(value.value == 0){
-            return;
-          }
-          if(value.dataType === 'Number'){
-            if(parseInt(value.value) != NaN && parseInt(value.value) != 0){
-              this.selectedElement.attrs[key] = parseInt(value.value);
+            const val = value.value;
+            if(val === '' || (Array.isArray(val) && val.length === 0))
+              return;
+
+            if(val === 0 && value.type !== 'Number'){
+              return;
+            }
+            if(value.dataType === 'Number' || value.type === 'Number'){
+              const parsed = parseFloat(val);
+              if(!isNaN(parsed)){
+                this.selectedElement.attrs[key] = parsed;
+              } else {
+                this.selectedElement.attrs[key] = val;
+              }
             }
             else{
-              this.selectedElement.attrs[key] = value.value;
+              this.selectedElement.attrs[key] = val;
             }
-          }
-          else{
-            this.selectedElement.attrs[key] = value.value;
-          }
+          });
           callback();
-        });
       }"
         @update-rn="handleUpdateRn"
+        @zoom-view="(el) => { this.attrSetting = false; if(this.selectedElement) this.selectedElement.selected=false; this.selectedElement = undefined; openZoomView(el); }"
         />
       </div>
     </div>
@@ -299,6 +324,8 @@ export default {
       subscriptionResourceName: null,
       flashingResources: new Set(),
       flashingEffectEnabled: true,  // 번쩍이는 효과 토글 (기본값: 켜짐)
+      csePreset: 'none',           // CSE 프리셋 ('none' | 'tinyiot')
+      showSettings: false,         // 설정 패널 표시 여부
       mqttTopic: '/oneM2M/req/tinyiot/designTool',  // oneM2M 표준 형식 (맨 앞 /  필수!)
       // 확대 뷰 관련
       showZoomView: false,
@@ -326,9 +353,35 @@ export default {
     //get_jsonfile(cse);
     if (cse!=undefined) this.cse1 = cse;
     this.targetIP = sessionStorage.getItem('targetIP');
+
+    // localStorage에서 설정값 복원
+    const savedPreset = localStorage.getItem('csePreset');
+    if (savedPreset) this.csePreset = savedPreset;
+    const savedFlash = localStorage.getItem('flashingEffectEnabled');
+    if (savedFlash !== null) this.flashingEffectEnabled = savedFlash === 'true';
+  },
+
+  mounted() {
+    // 설정 패널 외부 클릭 시 닫기
+    document.addEventListener('click', (e) => {
+      if (this.showSettings) {
+        const wrapper = this.$el.querySelector('.settings-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+          this.showSettings = false;
+        }
+      }
+    });
   },
 
   methods: {
+
+    onCsePresetChange() {
+      localStorage.setItem('csePreset', this.csePreset);
+    },
+
+    onFlashEffectToggle() {
+      localStorage.setItem('flashingEffectEnabled', String(this.flashingEffectEnabled));
+    },
 
     saveResourceTree(){ // 리소스트리 텍스트파일로 저장할때 실행되는 곳
       console.log("saveResourceTree");
@@ -376,6 +429,9 @@ export default {
         node.tasks = node.tasks.filter(t => t.ty !== 4 && t.ty !== 58);
         node.tasks.forEach(child => this.stripCloneInstances(child));
       }
+      if (node.ty === 3 || node.ty === 28) {
+        node.instancesLoaded = false;
+      }
     },
 
     // 노드와 그 하위의 모든 CNT/FCNT에서 CIN/FCIN 인스턴스 로드
@@ -390,7 +446,10 @@ export default {
           const disc = await http_resource_retrieve(
             this.originator, target.host, target.port, path, `fu=1&ty=4&lim=${limit}`
           );
-          const uris = disc['m2m:uril'] || [];
+          let uris = disc['m2m:uril'] || [];
+          if (typeof uris === 'string') {
+            uris = uris.trim().split(/\s+/).filter(u => u.length > 0);
+          }
 
           for (const uri of uris) {
             const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
@@ -406,7 +465,7 @@ export default {
             }
           }
           node.instancesLoaded = true;
-          node.instancesLoadedAll = false;
+          node.instancesLoadedAll = (uris.length < limit);
           console.log(`[loadInstances] Loaded ${uris.length} CINs for ${node.attrs?.rn}`);
         } catch (error) {
           console.warn(`[loadInstances] No CINs for ${node.attrs?.rn}`);
@@ -420,7 +479,13 @@ export default {
           const disc = await http_resource_retrieve(
             this.originator, target.host, target.port, path, `fu=1&ty=58&lim=${limit}`
           );
-          const uris = disc['m2m:uril'] || [];
+          let uris = disc['m2m:uril'] || [];
+          if (typeof uris === 'string') {
+            uris = uris.trim().split(/\s+/).filter(u => u.length > 0);
+          }
+          if (!Array.isArray(uris)) {
+            uris = [uris];
+          }
 
           for (const uri of uris) {
             const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
@@ -428,16 +493,25 @@ export default {
               const fcinData = await http_resource_retrieve(
                 this.originator, target.host, target.port, cleanUri, ''
               );
-              if (fcinData['m2m:fcin']) {
-                node.tasks.push(this.convertNode(fcinData['m2m:fcin'], 'FCIN', 0, false));
+              // m2m:fcin 또는 다른 키(cod: 등)로 올 수 있으므로 유연하게 처리
+              let fcinNode = fcinData['m2m:fcin'];
+              if (!fcinNode) {
+                for (const key of Object.keys(fcinData)) {
+                  if (typeof fcinData[key] === 'object' && fcinData[key] !== null && fcinData[key].ty === 58) {
+                    fcinNode = fcinData[key];
+                    break;
+                  }
+                }
+              }
+              if (fcinNode) {
+                node.tasks.push(this.convertNode(fcinNode, 'FCIN', 0, false));
               }
             } catch (err) {
               console.warn(`[loadInstances] Failed to load FCIN: ${cleanUri}`);
             }
           }
           node.instancesLoaded = true;
-          node.instancesLoadedAll = false;
-          console.log(`[loadInstances] Loaded ${uris.length} FCINs for ${node.attrs?.rn}`);
+          node.instancesLoadedAll = (uris.length < limit);
         } catch (error) {
           console.warn(`[loadInstances] No FCINs for ${node.attrs?.rn}`);
         }
@@ -644,6 +718,13 @@ async loadResources() {
   // CIN/FCIN을 최신 1개만 남기고 나머지 제거 (메인 트리 미리보기용)
   trimInstances(obj) {
     if (!obj || typeof obj !== 'object') return;
+    // 단일 객체를 배열로 정규화
+    if (obj['m2m:cin'] && !Array.isArray(obj['m2m:cin']) && typeof obj['m2m:cin'] === 'object') {
+      obj['m2m:cin'] = [obj['m2m:cin']];
+    }
+    if (obj['m2m:fcin'] && !Array.isArray(obj['m2m:fcin']) && typeof obj['m2m:fcin'] === 'object') {
+      obj['m2m:fcin'] = [obj['m2m:fcin']];
+    }
     if (Array.isArray(obj['m2m:cin']) && obj['m2m:cin'].length > 0) {
       obj['m2m:cin'] = obj['m2m:cin'].slice(-1);
     }
@@ -691,6 +772,25 @@ async loadResources() {
             });
         }
 
+        // FCNT/FCIN의 경우 SDT 커스텀 속성 보존 (스키마에 없는 나머지 속성 전부 복사)
+        if (node.ty === 28 || node.ty === 58) {
+            const skipKeys = ['ri', 'ct', 'lt', 'pi', 'et', 'st', 'ty', 'cni', 'cbs'];
+            Object.keys(node).forEach((key) => {
+                if (!key.startsWith('m2m:') && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
+                    // custom_attrs가 객체면 펼쳐서 개별 속성으로 저장
+                    if (key === 'custom_attrs' && typeof node[key] === 'object' && node[key] !== null && !Array.isArray(node[key])) {
+                        Object.entries(node[key]).forEach(([cKey, cVal]) => {
+                            if (baseAttrs[cKey] === undefined) {
+                                baseAttrs[cKey] = cVal;
+                            }
+                        });
+                    } else {
+                        baseAttrs[key] = node[key];
+                    }
+                }
+            });
+        }
+
         // 토글 제거: 모든 리소스의 hasChildren = false (토글 버튼 숨김)
         // CIN과 SUB는 자동 로드되어 항상 표시됨
         const hasChildren = false;
@@ -718,20 +818,36 @@ async loadResources() {
             result.childType = 4; // CIN
         }
 
+        // FCNT의 경우 cni로 FCIN 개수 저장
+        if (node.ty === 28 && node.cni !== undefined) {
+            result.childCount = node.cni;
+            result.childType = 58; // FCIN
+        }
+
         // 자식노드에 재귀적 요청
         let hasCINChildren = false;
         for (const key in node) {
-            if (node.hasOwnProperty(key) && key.startsWith('m2m:') && Array.isArray(node[key])) {
+            if (node.hasOwnProperty(key) && key.startsWith('m2m:')) {
+                let children = node[key];
+                // 단일 객체일 경우 배열로 감싸기 (서버가 1개일 때 객체로 반환)
+                if (!Array.isArray(children)) {
+                    if (typeof children === 'object' && children !== null) {
+                        children = [children];
+                    } else {
+                        continue;
+                    }
+                }
+
                 // CIN 제외 옵션이 켜져 있고 CIN 자식이면 스킵
                 if (excludeCIN && key === 'm2m:cin') {
                     hasCINChildren = true;
-                    console.log(`[convertNode] Skipping CIN children for ${nodeName} (${node[key].length} CINs)`);
+                    console.log(`[convertNode] Skipping CIN children for ${nodeName} (${children.length} CINs)`);
                     continue;
                 }
 
                 const childNodeName = key.replace('m2m:', '').toUpperCase();
                 // depth를 1 증가시켜서 재귀 호출 (excludeCIN 전달)
-                result.tasks.push(...node[key].map(child => this.convertNode(child, childNodeName, depth + 1, excludeCIN)));
+                result.tasks.push(...children.map(child => this.convertNode(child, childNodeName, depth + 1, excludeCIN)));
             }
         }
 
@@ -853,7 +969,6 @@ async loadResources() {
                     continue;
                 }
                 const childNodeName = key.replace('m2m:', '').toUpperCase();
-                // convertNode with excludeCIN = false, CIN과 SUB 포함
                 convertedData.tasks.push(...rootNode[key].map(child => this.convertNode(child, childNodeName, 1, false)));
             }
         }
@@ -2449,7 +2564,9 @@ async loadResources() {
         3: 'CNT',
         4: 'CIN',
         9: 'GRP',
-        23: 'SUB'
+        23: 'SUB',
+        28: 'FCNT',
+        58: 'FCIN'
       };
       return typeMap[ty] || 'UNKNOWN';
     },
@@ -2463,7 +2580,9 @@ async loadResources() {
         3: 'm2m:cnt',  // CNT
         4: 'm2m:cin',  // CIN
         9: 'm2m:grp',  // GRP
-        23: 'm2m:sub'  // SUB
+        23: 'm2m:sub', // SUB
+        28: 'm2m:fcnt', // FCNT
+        58: 'm2m:fcin'  // FCIN
       };
       return typeMap[ty] || 'm2m:unknown';
     },
@@ -2507,8 +2626,26 @@ async loadResources() {
             });
         }
 
-        // hasChildren은 오직 CNT(ty=3)이면서 CIN이 있는 경우만 true
-        // CNT는 cni(CIN count) 또는 cbs를 체크
+        // FCNT/FCIN의 경우 SDT 커스텀 속성 보존 (스키마에 없는 나머지 속성 전부 복사)
+        if (node.ty === 28 || node.ty === 58) {
+            const skipKeys = ['ri', 'ct', 'lt', 'pi', 'et', 'st', 'ty', 'cni', 'cbs'];
+            Object.keys(node).forEach((key) => {
+                if (!key.startsWith('m2m:') && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
+                    // custom_attrs가 객체면 펼쳐서 개별 속성으로 저장
+                    if (key === 'custom_attrs' && typeof node[key] === 'object' && node[key] !== null && !Array.isArray(node[key])) {
+                        Object.entries(node[key]).forEach(([cKey, cVal]) => {
+                            if (baseAttrs[cKey] === undefined) {
+                                baseAttrs[cKey] = cVal;
+                            }
+                        });
+                    } else {
+                        baseAttrs[key] = node[key];
+                    }
+                }
+            });
+        }
+
+        // hasChildren: CNT(ty=3) 또는 FCNT(ty=28)이면서 인스턴스가 있는 경우 true
         let hasChildren = false;
         if (node.ty === 3) {
             // CNT의 경우: cni(CIN count) 또는 cbs를 확인
@@ -2517,8 +2654,14 @@ async loadResources() {
             } else if (node.cbs !== undefined && node.cbs > 0) {
                 hasChildren = true;
             }
+        } else if (node.ty === 28) {
+            // FCNT의 경우: cni(FCIN count) 또는 cbs를 확인
+            if (node.cni !== undefined && node.cni > 0) {
+                hasChildren = true;
+            } else if (node.cbs !== undefined && node.cbs > 0) {
+                hasChildren = true;
+            }
         }
-        // 나머지 리소스들(CSE, AE, ACP, SUB 등)은 hasChildren = false (토글 없이 항상 표시)
 
         const result = {
             name: nodeName,
@@ -2539,6 +2682,12 @@ async loadResources() {
         if (node.ty === 3 && node.cni !== undefined) {
             result.childCount = node.cni;
             result.childType = 4; // CIN
+        }
+
+        // FCNT의 경우 cni로 FCIN 개수 저장 (표시용)
+        if (node.ty === 28 && node.cni !== undefined) {
+            result.childCount = node.cni;
+            result.childType = 58; // FCIN
         }
 
         return result;
@@ -2780,7 +2929,9 @@ async loadResources() {
   display: block;
   margin-bottom: 0;
   min-width: 1200px;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  z-index: 100;
 }
 
 
@@ -2851,7 +3002,7 @@ async loadResources() {
   display: block;
   top: 0;
   left: 0;
-  z-index: 100;
+  z-index: 1100;
   width: 100vw;
   height: 100vh;
 
@@ -2861,7 +3012,7 @@ async loadResources() {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 100;
+  z-index: 1100;
   width: 100vw;
   height: 100vh;
   background-color: rgba(0,0,0,0.3);
@@ -2872,7 +3023,7 @@ async loadResources() {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 101;
+  z-index: 1101;
   width: 70vw;
   height: auto;
   background-color: #fff;
@@ -3069,6 +3220,79 @@ async loadResources() {
 
 .toggle-slider:hover {
   box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
+}
+
+/* 설정 패널 스타일 */
+.settings-wrapper {
+  position: relative;
+}
+
+.settings-gear {
+  font-size: 22px;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+  user-select: none;
+  line-height: 1;
+}
+
+.settings-gear:hover {
+  transform: rotate(45deg);
+}
+
+.settings-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: linear-gradient(145deg, #1e3a5f, #152238);
+  border: 1px solid #0d1829;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 240px;
+  z-index: 9999;
+  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.4), -4px -4px 12px rgba(255, 255, 255, 0.05);
+}
+
+.settings-panel-title {
+  color: #aaa;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.settings-row:last-child {
+  margin-bottom: 0;
+}
+
+.settings-label {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.settings-select {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-select option {
+  background: #1e3a5f;
+  color: white;
 }
 
 /* 큰 토글 스위치 스타일 */

@@ -30,9 +30,9 @@
             {{ getDisplayText(element) }}
           </p>
 
-          <!-- CNT의 CIN만 토글 표시: CNT(ty=3)이면서 자식이 CIN(childType=4)인 경우만 -->
+          <!-- CNT/FCNT 인스턴스 토글 표시: CNT(ty=3)/FCNT(ty=28)이면서 자식 인스턴스가 있는 경우 -->
           <button
-            v-if="element.ty === 3 && element.createdOnServer && element.hasChildren && element.childType === 4"
+            v-if="(element.ty === 3 || element.ty === 28) && element.createdOnServer && element.hasChildren && (element.childType === 4 || element.childType === 58)"
             class="toggleBtn"
             :style="getToggleStyle(element.ty)"
             @click.stop="$emit('toggle-expand', element, 'default')"
@@ -40,19 +40,9 @@
           >
             {{ element.expanded ? '−' : '+' }}
           </button>
-          <span v-if="element.ty === 3 && element.childCount" class="child-count">
+          <span v-if="(element.ty === 3 || element.ty === 28) && element.childCount" class="child-count">
             {{ element.childCount }}
           </span>
-
-          <!-- AE 확대 보기 + CSE 직속 CNT/FCNT만 확대 보기 -->
-          <button
-            v-if="(element.ty === 2 || ((element.ty === 3 || element.ty === 28) && element.cseDirectChild)) && element.createdOnServer && this.group.name !== 'zoomTree'"
-            class="zoomBtn"
-            @click.stop="$emit('zoom-view', element)"
-            title="Expand View"
-          >
-            🔍
-          </button>
 
           <!-- 줌뷰 내 CNT/FCNT에서 전체 인스턴스 로드 버튼 -->
           <button
@@ -69,9 +59,9 @@
           </button>
         </div>
 
-        <!-- Show children: CNT의 CIN만 토글 제어, CNT의 CNT는 항상 표시 -->
+        <!-- Show children: CNT/FCNT 인스턴스 토글 제어, 나머지는 항상 표시 -->
         <nested-draggable
-          v-if="(element.ty === 3 && element.childType === 4 ? element.expanded : true) && element.tasks && getChildRT(element.ty).length > 0"
+          v-if="(((element.ty === 3 && element.childType === 4) || (element.ty === 28 && element.childType === 58)) ? element.expanded : true) && element.tasks && getChildRT(element.ty).length > 0"
           :tasks="element.tasks"
           :group="this.group"
           @clicked="(element) => { $emit('clicked', element) }"
@@ -324,6 +314,16 @@ export default {
         }
       }
 
+      if (element.ty === RT_FCIN) {
+        const skipKeys = ['rn', 'lbl', 'ty', 'cs', 'ri', 'ct', 'lt', 'pi', 'et', 'st', 'cni', 'cbs', 'cnd', 'org', 'cnf'];
+        const customPairs = Object.entries(attrs)
+          .filter(([key]) => !skipKeys.includes(key))
+          .map(([key, val]) => `${key}: ${val}`);
+        if (customPairs.length > 0) {
+          return customPairs.join(', ');
+        }
+      }
+
       if (attrs.rn && attrs.rn !== '') {
         return attrs.rn;
       }
@@ -539,6 +539,26 @@ export default {
 }
 .nestTree .nestTree {
   margin-left: 147px !important;
+}
+/* 마지막 자식: └ 모양으로 깔끔하게 연결 */
+.nestTree:last-child {
+  border-left-color: transparent;
+}
+.nestTree:last-child > .nestedBox {
+  position: relative;
+}
+.nestTree:last-child > .nestedBox > .horizontalLine {
+  visibility: hidden;
+}
+.nestTree:last-child > .nestedBox::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: -8px;
+  bottom: calc(50% - 1px);
+  width: 60px;
+  border-left: 2px solid black;
+  border-bottom: 2px solid black;
 }
 .selected {
   border: 2px solid orange !important;
