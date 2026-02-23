@@ -7,7 +7,9 @@ export const resourceType = {
     CSE: 5,
     CSR: 16,
     SUB: 23,
-    GRP: 9
+    GRP: 9,
+    FCNT: 28,
+    FCIN: 58
 };
 
 
@@ -674,6 +676,144 @@ export const resourceAttributes = {
             required:true,
             disable: true,
             value: 23
+        },
+    },
+
+    28: { // FCNT (FlexContainer)
+        'rn': {
+            type: "text",
+            fullName: "Resource Name",
+            description: "The name of the resource",
+            required: false,
+            disable: false,
+            value: ''
+        },
+        'lbl': {
+            type: "Array",
+            fullName: "Label",
+            description: "The label of the resource",
+            required: false,
+            disable: false,
+            value: []
+        },
+        'acpi': {
+            type: "Array",
+            fullName: "Access Control Policy IDs",
+            description: "Resource ID or path of ACP resource to control access to this resource",
+            required: false,
+            disable: false,
+            value: []
+        },
+        'cnd': {
+            type: "text",
+            fullName: "Container Definition",
+            description: "The container definition of the FlexContainer",
+            required: false,
+            disable: false,
+            value: ''
+        },
+        'or': {
+            type: "text",
+            fullName: "Ontology Ref",
+            description: "Reference to an ontology",
+            required: false,
+            disable: false,
+            value: ''
+        },
+        'mni': {
+            type: "Number",
+            fullName: "Max Nr of Instances",
+            description: "The maximum number of instances of the resource",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) {
+                if (value < 0) return false;
+                return true;
+            }
+        },
+        'mbs': {
+            type: "Number",
+            fullName: "Max Byte Size",
+            description: "The maximum byte size of the resource",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) {
+                if (value < 0) return false;
+                return true;
+            }
+        },
+        'mia': {
+            type: "Number",
+            fullName: "Max Instance Age",
+            description: "The maximum instance age of the resource",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) {
+                if (value < 0) return false;
+                return true;
+            }
+        },
+        'cr': {
+            type: "Boolean",
+            fullName: "Creator",
+            description: "Choose whether add creator attribute to the resource",
+            required: false,
+            disable: false,
+            value: false
+        },
+        'ty': {
+            type: "Number",
+            fullName: "Resource Type",
+            description: "The resource type of the resource",
+            required: true,
+            disable: true,
+            value: 28
+        },
+    },
+
+    58: { // FCIN (FlexContainerInstance)
+        'rn': {
+            type: "text",
+            fullName: "Resource Name",
+            description: "The name of the resource",
+            required: false,
+            disable: false,
+            value: ''
+        },
+        'lbl': {
+            type: "Array",
+            fullName: "Label",
+            description: "The label of the resource",
+            required: false,
+            disable: false,
+            value: []
+        },
+        'con': {
+            type: "text",
+            fullName: "Content",
+            description: "The actual data content of the FlexContainerInstance",
+            required: false,
+            disable: false,
+            value: ''
+        },
+        'cs': {
+            type: "Number",
+            fullName: "Content Size",
+            description: "Size of the content in bytes",
+            required: false,
+            disable: true,
+            value: 0
+        },
+        'ty': {
+            type: "Number",
+            fullName: "Resource Type",
+            description: "The resource type of the resource",
+            required: true,
+            disable: true,
+            value: 58
         },
     },
 

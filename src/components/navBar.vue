@@ -1,5 +1,5 @@
 <template>
-    <div class="row">
+    <div>
       <!-- Navbar -->
       <nav class="component-navbar">
         <div class="col-8 title">
@@ -20,18 +20,23 @@
 
   <style scoped>
   .component-navbar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 15px 20px;
+  background: linear-gradient(135deg, #5a6fe6 0%, #667eea 30%, #8b6cc1 70%, #764ba2 100%);
+  padding: 18px 24px;
   border-radius: 20px;
-  margin: 10px 25px 10px 25px;
+  margin: 10px 20px;
   box-shadow:
-    0 10px 30px rgba(102, 126, 234, 0.4),
-    0 1px 8px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 14px 36px rgba(102, 126, 234, 0.45),
+    0 6px 16px rgba(118, 75, 162, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.15),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   position: relative;
   backdrop-filter: blur(10px);
 }

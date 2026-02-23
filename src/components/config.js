@@ -11,6 +11,8 @@ export const resource = {
     ae : 2,
     cnt : 3,
     grp : 9,
-    sub : 23
+    sub : 23,
+    fcnt : 28,
+    fcin : 58
 }
 

@@ -89,7 +89,8 @@ const RT_CNT = 3;
 const RT_CIN = 4;
 const RT_GRP = 9;
 const RT_SUB = 23;
-const RT_FCNT = 7;
+const RT_FCNT = 28;
+const RT_FCIN = 58;
 const RT_TS = 8;
 const RT_TSI = 9;
 const RT_TSR = 10;
@@ -104,7 +105,9 @@ const resourceStructure = {
   4: [],
   9: [],
   16: [],
-  23: []
+  23: [],
+  28: [RT_FCNT, RT_FCIN, RT_CNT, RT_SUB],
+  58: []
 };
 
 export default {
@@ -218,8 +221,8 @@ export default {
           };
         case RT_CIN:
           return {
-            border: "2px solid #00BCD4",
-            backgroundColor: "rgba(0, 188, 212, 0.1)",
+            border: "2px solid #FFB74D",
+            backgroundColor: "rgba(255, 183, 77, 0.1)",
             padding: "6px",
             borderRadius: "10px",
             justifyContent: 'center'
@@ -249,8 +252,16 @@ export default {
           };
         case RT_FCNT:
           return {
-            border: "2px solid #FFC107",
-            backgroundColor: "rgba(255, 193, 7, 0.2)",
+            border: "2px solid #E53935",
+            backgroundColor: "rgba(229, 57, 53, 0.1)",
+            padding: "6px",
+            borderRadius: "10px",
+            justifyContent: 'center'
+          };
+        case RT_FCIN:
+          return {
+            border: "2px solid #EF9A9A",
+            backgroundColor: "rgba(239, 154, 154, 0.1)",
             padding: "6px",
             borderRadius: "10px",
             justifyContent: 'center'
@@ -322,8 +333,8 @@ export default {
           shadowColor = 'rgba(255, 152, 0, 0.5)';
           break;
         case RT_CIN:
-          bgColor = '#00BCD4';
-          shadowColor = 'rgba(0, 188, 212, 0.5)';
+          bgColor = '#FFB74D';
+          shadowColor = 'rgba(255, 183, 77, 0.5)';
           break;
         case RT_ACP:
           bgColor = 'red';
@@ -338,8 +349,12 @@ export default {
           shadowColor = 'rgba(33, 150, 243, 0.5)';
           break;
         case RT_FCNT:
-          bgColor = '#FFC107';
-          shadowColor = 'rgba(255, 193, 7, 0.5)';
+          bgColor = '#E53935';
+          shadowColor = 'rgba(229, 57, 53, 0.5)';
+          break;
+        case RT_FCIN:
+          bgColor = '#EF9A9A';
+          shadowColor = 'rgba(239, 154, 154, 0.5)';
           break;
         case RT_TS:
           bgColor = '#3F51B5';
@@ -442,6 +457,8 @@ export default {
 .dragArea {
   min-height: 20px;
   width: 100%;
+  padding-left: 0;
+  margin: 0;
 }
 .resources .resourceBox .dragArea {
   padding-left: 0px;
@@ -474,8 +491,11 @@ export default {
 }
 .nestTree {
   border-left: 2px solid black;
-  margin-left: 100px !important;
+  margin-left: 87px !important;
   padding-top: 8px !important;
+}
+.nestTree .nestTree {
+  margin-left: 147px !important;
 }
 .selected {
   border: 2px solid orange !important;

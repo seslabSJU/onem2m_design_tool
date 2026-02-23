@@ -277,7 +277,8 @@ export default {
           { name: "CIN", ty: RT.CIN },
           { name: "GRP", ty: RT.GRP },
           { name: "SUB", ty: RT.SUB },
-          // { name: "FCNT", ty: RT.FCNT },
+          { name: "FCNT", ty: RT.FCNT },
+          { name: "FCIN", ty: RT.FCIN },
       ]
       ,
       attrSetting : false,
@@ -2374,7 +2375,7 @@ async loadResources() {
           // 타입 매핑
           const typeMap = {
             'AE': 2, 'CNT': 3, 'CIN': 4, 'ACP': 1,
-            'GRP': 9, 'SUB': 23, 'FCNT': 7
+            'GRP': 9, 'SUB': 23, 'FCNT': 28, 'FCIN': 58
           };
           resourceType = typeMap[typeStr];
           break;
@@ -3081,11 +3082,10 @@ async loadResources() {
   flex-direction: row;
   /* justify-content: space-between; */
   align-items: flex-start;
-  margin-left: 10px;
-  margin-right: 10px;
+  margin: 0 10px;
+  padding: 10px 0;
   min-width: 1200px;
   overflow: hidden;
-
 }
 .configure .box {
   border: 1px solid #0d1829;
@@ -3137,18 +3137,18 @@ async loadResources() {
 }
 
 .canvas {
-  border: 1px solid black;
+  border: 1px solid #d0d0d0;
   width: 78%;
   height: 80vh;
   padding: 10px;
   margin: 10px;
   background-color: #f3f3f3;
-  border-radius: 5px;
-  display: flex;  
+  border-radius: 15px;
+  display: flex;
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden;
-  box-shadow : 5px 5px 5px 5px #D5D5D5;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .scroll-container {
@@ -3157,25 +3157,24 @@ async loadResources() {
 }
 
 .rightTab {
-  border: 1px solid black;
+  border: 1px solid #d0d0d0;
   width: 20%;
   height: 80vh;
   padding: 10px;
   margin: 10px;
   overflow: auto;
   background-color: #f3f3f3;
-  border-radius: 5px;
+  border-radius: 15px;
   box-sizing: border-box;
   position: relative;
-  box-shadow : 5px 5px 5px 5px #D5D5D5;
-
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .nav {
-  margin-bottom: 15px;
+  display: block;
+  margin-bottom: 0;
   min-width: 1200px;
   overflow: hidden;
-  margin-right: 0px;
 }
 
 
