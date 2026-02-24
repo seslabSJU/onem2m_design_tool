@@ -87,6 +87,8 @@ export async function make_request_resource(currentNode, path, targetIP, origina
     23: ['ty', 'rn', 'lbl', 'cr', 'acpi', 'enc', 'nu', 'su', 'nec', 'ln', 'nct', 'exc'],                 // SUB
     28: ['ty', 'rn', 'lbl', 'acpi', 'cnd', 'or', 'cr', 'mni', 'mbs', 'mia', 'fcied'],                     // FCNT
     58: ['ty', 'rn', 'lbl', 'con', 'cs'],                                                                  // FCIN
+    29: ['ty', 'rn', 'lbl', 'acpi', 'cr', 'mni', 'mbs', 'pei', 'peid', 'mdd', 'mdn', 'mdt', 'mdc', 'mdlt', 'cnf'], // TS
+    30: ['ty', 'rn', 'lbl', 'con', 'dgt', 'snr'],                                                          // TSI
   };
 
   var resource = {};

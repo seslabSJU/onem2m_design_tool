@@ -9,7 +9,9 @@ export const resourceType = {
     SUB: 23,
     GRP: 9,
     FCNT: 28,
-    FCIN: 58
+    FCIN: 58,
+    TS: 29,
+    TSI: 30
 };
 
 
@@ -842,6 +844,194 @@ export const resourceAttributes = {
         },
     },
 
+    29: { // TS (TimeSeries)
+        'rn': {
+            type: "text",
+            fullName: "Resource Name",
+            description: "The name of the resource",
+            required: false,
+            disable: false,
+            value: ''
+        },
+        'lbl': {
+            type: "Array",
+            fullName: "Label",
+            description: "The label of the resource",
+            required: false,
+            disable: false,
+            value: []
+        },
+        'acpi': {
+            type: "Array",
+            fullName: "Access Control Policy IDs",
+            description: "Resource ID or path of ACP resource to control access to this resource",
+            required: false,
+            disable: false,
+            value: []
+        },
+        'mni': {
+            type: "Number",
+            fullName: "Max Nr of Instances",
+            description: "Maximum number of TSI instances",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) { return value >= 0; }
+        },
+        'mbs': {
+            type: "Number",
+            fullName: "Max Byte Size",
+            description: "Maximum byte size of stored instances",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) { return value >= 0; }
+        },
+        'pei': {
+            type: "Number",
+            fullName: "Periodic Interval (ms)",
+            description: "Expected periodic data arrival interval in milliseconds",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) { return value >= 0; }
+        },
+        'mdd': {
+            type: "Boolean",
+            fullName: "Missing Data Detect",
+            description: "Enable missing data detection",
+            required: false,
+            disable: false,
+            value: false
+        },
+        'mdn': {
+            type: "Number",
+            fullName: "Missing Data Max Nr",
+            description: "Maximum missing data count threshold",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) { return value >= 0; }
+        },
+        'mdt': {
+            type: "Number",
+            fullName: "Missing Data Timer (ms)",
+            description: "Missing data detection timeout in milliseconds",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) { return value >= 0; }
+        },
+        'peid': {
+            type: "Number",
+            fullName: "Periodic Interval Expected (ms)",
+            description: "Expected periodic interval (defaults to pei/2 if not specified)",
+            required: false,
+            disable: false,
+            value: 0,
+            validation: function (value) { return value >= 0; }
+        },
+        'mdc': {
+            type: "Number",
+            fullName: "Missing Data Count",
+            description: "Current missing data count (read-only, server-managed)",
+            required: false,
+            disable: true,
+            value: 0
+        },
+        'mdlt': {
+            type: "text",
+            fullName: "Missing Data Last Time",
+            description: "Timestamp of last missing data detection (read-only, server-managed)",
+            required: false,
+            disable: true,
+            value: ''
+        },
+        'cnf': {
+            type: "text",
+            fullName: "Content Info",
+            description: "MIME type of the content",
+            required: false,
+            disable: false,
+            value: ''
+        },
+        'cr': {
+            type: "Boolean",
+            fullName: "Creator",
+            description: "Choose whether add creator attribute to the resource",
+            required: false,
+            disable: false,
+            value: false
+        },
+        'ty': {
+            type: "Number",
+            fullName: "Resource Type",
+            description: "The resource type of the resource",
+            required: true,
+            disable: true,
+            value: 29
+        },
+    },
+
+    30: { // TSI (TimeSeriesInstance)
+        'rn': {
+            type: "text",
+            fullName: "Resource Name",
+            description: "The name of the resource",
+            required: false,
+            disable: false,
+            value: ''
+        },
+        'lbl': {
+            type: "Array",
+            fullName: "Label",
+            description: "The label of the resource",
+            required: false,
+            disable: false,
+            value: []
+        },
+        'dgt': {
+            type: "text",
+            fullName: "Data Generation Time",
+            description: "Timestamp when data was generated (YYYYMMDDThhmmss,NNNNNN format)",
+            required: true,
+            disable: false,
+            value: ''
+        },
+        'con': {
+            type: "text",
+            fullName: "Content",
+            description: "The actual data content",
+            required: true,
+            disable: false,
+            value: ''
+        },
+        'snr': {
+            type: "Number",
+            fullName: "Sequence Number",
+            description: "Sequence number (auto-assigned if not provided)",
+            required: false,
+            disable: false,
+            value: 0
+        },
+        'cs': {
+            type: "Number",
+            fullName: "Content Size",
+            description: "Size of the content in bytes",
+            required: false,
+            disable: true,
+            value: 0
+        },
+        'ty': {
+            type: "Number",
+            fullName: "Resource Type",
+            description: "The resource type of the resource",
+            required: true,
+            disable: true,
+            value: 30
+        },
+    },
+
     4: { // CIN (ContentInstance)
         'rn': {
             type: "text",
@@ -932,6 +1122,13 @@ export const tinyIoTPresets = {
     curT0: 25.5
   },
   58: { // FCIN — 자동 생성이라 프리셋 없음
+  },
+  29: { // TS
+    rn: 'tempSensor', pei: 5000, mdd: true, mdn: 3, mdt: 15000,
+    mni: 100, mbs: 262144
+  },
+  30: { // TSI
+    con: '25.5', dgt: '20260223T120000,000000'
   }
 };
 

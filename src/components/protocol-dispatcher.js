@@ -38,7 +38,7 @@ async function mqtt_create_resource(attr, path, targetIP) {
   const host = extractHost(targetIP);
   const wsPort = getMqttWsPort();
 
-  const typeMap = { 1: 'acp', 2: 'ae', 3: 'cnt', 4: 'cin', 9: 'grp', 23: 'sub', 28: 'fcnt', 58: 'fcin' };
+  const typeMap = { 1: 'acp', 2: 'ae', 3: 'cnt', 4: 'cin', 9: 'grp', 23: 'sub', 28: 'fcnt', 58: 'fcin', 29: 'ts', 30: 'tsi' };
   const ty = attr['ty'];
   const nowType = typeMap[ty] || 'unknown';
 

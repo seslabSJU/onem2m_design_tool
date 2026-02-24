@@ -30,9 +30,9 @@
             {{ getDisplayText(element) }}
           </p>
 
-          <!-- CNT/FCNT 인스턴스 토글 표시: CNT(ty=3)/FCNT(ty=28)이면서 자식 인스턴스가 있는 경우 -->
+          <!-- CNT/FCNT/TS 인스턴스 토글 표시 -->
           <button
-            v-if="(element.ty === 3 || element.ty === 28) && element.createdOnServer && element.hasChildren && (element.childType === 4 || element.childType === 58)"
+            v-if="(element.ty === 3 || element.ty === 28 || element.ty === 29) && element.createdOnServer && element.hasChildren && (element.childType === 4 || element.childType === 58 || element.childType === 30)"
             class="toggleBtn"
             :style="getToggleStyle(element.ty)"
             @click.stop="$emit('toggle-expand', element, 'default')"
@@ -44,9 +44,9 @@
             {{ element.childCount }}
           </span>
 
-          <!-- 줌뷰 내 CNT/FCNT에서 전체 인스턴스 로드 버튼 -->
+          <!-- 줌뷰 내 CNT/FCNT/TS에서 전체 인스턴스 로드 버튼 -->
           <button
-            v-if="(element.ty === 3 || element.ty === 28)
+            v-if="(element.ty === 3 || element.ty === 28 || element.ty === 29)
               && element.createdOnServer
               && element.instancesLoaded
               && !element.instancesLoadedAll
@@ -61,7 +61,7 @@
 
         <!-- Show children: CNT/FCNT 인스턴스 토글 제어, 나머지는 항상 표시 -->
         <nested-draggable
-          v-if="(((element.ty === 3 && element.childType === 4) || (element.ty === 28 && element.childType === 58)) ? element.expanded : true) && element.tasks && getChildRT(element.ty).length > 0"
+          v-if="(((element.ty === 3 && element.childType === 4) || (element.ty === 28 && element.childType === 58) || (element.ty === 29 && element.childType === 30)) ? element.expanded : true) && element.tasks && getChildRT(element.ty).length > 0"
           :tasks="element.tasks"
           :group="this.group"
           @clicked="(element) => { $emit('clicked', element) }"
@@ -96,22 +96,23 @@ const RT_GRP = 9;
 const RT_SUB = 23;
 const RT_FCNT = 28;
 const RT_FCIN = 58;
-const RT_TS = 8;
-const RT_TSI = 9;
-const RT_TSR = 10;
+const RT_TS = 29;
+const RT_TSI = 30;
 const RT_MGMTOBJ = 11;
 const RT_NODE = 14;
 
 const resourceStructure = {
   5: [RT_AE, RT_GRP, RT_MGMTOBJ, RT_ACP, RT_FCNT, RT_CNT, RT_SUB],
   1: [],
-  2: [RT_CNT, RT_GRP, RT_SUB, RT_FCNT, RT_TS, RT_TSI, RT_TSR, RT_MGMTOBJ, RT_NODE],
-  3: [RT_CNT, RT_CIN, RT_FCNT, RT_TS, RT_SUB],
+  2: [RT_CNT, RT_GRP, RT_SUB, RT_FCNT, RT_TS, RT_MGMTOBJ, RT_NODE],
+  3: [RT_CNT, RT_CIN, RT_FCNT, RT_SUB],
   4: [],
   9: [],
   16: [],
   23: [],
   28: [RT_FCNT, RT_FCIN, RT_CNT, RT_SUB],
+  29: [RT_TSI, RT_SUB],
+  30: [],
   58: []
 };
 
@@ -274,7 +275,15 @@ export default {
         case RT_TS:
           return {
             border: "2px solid #3F51B5",
-            backgroundColor: "rgba(63, 81, 181, 0.2)",
+            backgroundColor: "rgba(63, 81, 181, 0.12)",
+            padding: "6px",
+            borderRadius: "10px",
+            justifyContent: 'center'
+          };
+        case RT_TSI:
+          return {
+            border: "2px solid #7986CB",
+            backgroundColor: "rgba(121, 134, 203, 0.15)",
             padding: "6px",
             borderRadius: "10px",
             justifyContent: 'center'
@@ -284,7 +293,7 @@ export default {
       }
     },
     getChildRT(parent_ty) {
-      return resourceStructure[parent_ty];
+      return resourceStructure[parent_ty] || [];
     },
     getIcon(type) {
       const icons = {
@@ -321,6 +330,24 @@ export default {
           .map(([key, val]) => `${key}: ${val}`);
         if (customPairs.length > 0) {
           return customPairs.join(', ');
+        }
+      }
+
+      if (element.ty === RT_TSI) {
+        if (attrs.con && attrs.con !== '') {
+          return attrs.dgt ? `${attrs.con} (${attrs.dgt})` : attrs.con;
+        }
+        if (attrs.rn && attrs.rn !== '') {
+          return attrs.rn;
+        }
+      }
+
+      if (element.ty === RT_FCNT) {
+        if (attrs.cnd && attrs.cnd !== '') {
+          const cndParts = attrs.cnd.split('.');
+          const shortName = cndParts[cndParts.length - 1];
+          const abbr = shortName.length > 5 ? shortName.substring(0, 5) : shortName;
+          return `cod:${abbr}`;
         }
       }
 
@@ -374,6 +401,10 @@ export default {
         case RT_TS:
           bgColor = '#3F51B5';
           shadowColor = 'rgba(63, 81, 181, 0.5)';
+          break;
+        case RT_TSI:
+          bgColor = '#7986CB';
+          shadowColor = 'rgba(121, 134, 203, 0.5)';
           break;
         default:
           bgColor = '#667eea';
@@ -509,7 +540,7 @@ export default {
   outline: 0px !important;
 }
 .horizontalLine {
-  border-top: 2px solid black;
+  border-top: 1px solid black;
   width: 60px;
   height: 0px;
   display: inline-block;
@@ -533,7 +564,7 @@ export default {
   list-style-type: none;
 }
 .nestTree {
-  border-left: 2px solid black;
+  border-left: 1px solid black;
   margin-left: 87px !important;
   padding-top: 8px !important;
 }
@@ -553,12 +584,12 @@ export default {
 .nestTree:last-child > .nestedBox::before {
   content: '';
   position: absolute;
-  left: -2px;
+  left: -1px;
   top: -8px;
-  bottom: calc(50% - 1px);
+  bottom: 50%;
   width: 60px;
-  border-left: 2px solid black;
-  border-bottom: 2px solid black;
+  border-left: 1px solid black;
+  border-bottom: 1px solid black;
 }
 .selected {
   border: 2px solid orange !important;

@@ -30,7 +30,7 @@ async function select_resource(attr)
   const sub_header = ["ty"];
 
   var attribute_list = ["ty", "rvi"];
-  const typeMap = { 1: "acp", 2: "ae", 3: "cnt", 4: "cin", 9: "grp", 23: "sub", 28: "fcnt", 58: "fcin" };
+  const typeMap = { 1: "acp", 2: "ae", 3: "cnt", 4: "cin", 9: "grp", 23: "sub", 28: "fcnt", 58: "fcin", 29: "ts", 30: "tsi" };
   attr_list["type"] = typeMap[attr["ty"]] || "unknown";
 
   // console.log("att list check");

@@ -13,6 +13,8 @@ export const resource = {
     grp : 9,
     sub : 23,
     fcnt : 28,
-    fcin : 58
+    fcin : 58,
+    ts : 29,
+    tsi : 30
 }
 

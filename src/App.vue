@@ -419,6 +419,8 @@ export default {
           { name: "CIN", ty: RT.CIN },
           { name: "FCNT", ty: RT.FCNT },
           { name: "FCIN", ty: RT.FCIN },
+          { name: "TS", ty: RT.TS },
+          { name: "TSI", ty: RT.TSI },
       ],
       resManagement: [
           { name: "ACP", ty: RT.ACP },
@@ -457,6 +459,8 @@ export default {
         23: { origin: 'CAdmin', rvi: '3',  ri: 'create_sub',  accept: 'application/json' },
         28: { origin: 'CAdmin', rvi: '4',  ri: 'create_fcnt', accept: 'application/json' },
         58: { origin: 'CAdmin', rvi: '4',  ri: 'create_fcin', accept: 'application/json' },
+        29: { origin: 'CAdmin', rvi: '2a', ri: 'create_ts',   accept: 'application/json' },
+        30: { origin: 'CAdmin', rvi: '2a', ri: 'create_tsi',  accept: 'application/json' },
       },
       headerResourceTypes: [
         { ty: 1, name: 'ACP' },
@@ -467,6 +471,8 @@ export default {
         { ty: 23, name: 'SUB' },
         { ty: 28, name: 'FCNT' },
         { ty: 58, name: 'FCIN' },
+        { ty: 29, name: 'TS' },
+        { ty: 30, name: 'TSI' },
       ],
       mqttTopic: '/oneM2M/req/tinyiot/designTool',  // oneM2M 표준 형식 (맨 앞 /  필수!)
       // 확대 뷰 관련
@@ -599,10 +605,10 @@ export default {
     // 클론에서 CIN/FCIN 노드 제거 (줌뷰 로드 전 정리)
     stripCloneInstances(node) {
       if (node.tasks) {
-        node.tasks = node.tasks.filter(t => t.ty !== 4 && t.ty !== 58);
+        node.tasks = node.tasks.filter(t => t.ty !== 4 && t.ty !== 58 && t.ty !== 30);
         node.tasks.forEach(child => this.stripCloneInstances(child));
       }
-      if (node.ty === 3 || node.ty === 28) {
+      if (node.ty === 3 || node.ty === 28 || node.ty === 29) {
         node.instancesLoaded = false;
       }
     },
@@ -690,6 +696,42 @@ export default {
         }
       }
 
+      // TS(ty=29) → TSI(ty=30) 로드
+      if (node.ty === 29 && node.fullPath && !node.instancesLoaded) {
+        try {
+          const path = node.fullPath;
+          const disc = await retrieve_resource(
+            this.originator, target.host, target.port, path, `fu=1&ty=30&lim=${limit}`
+          );
+          let uris = disc['m2m:uril'] || [];
+          if (typeof uris === 'string') {
+            uris = uris.trim().split(/\s+/).filter(u => u.length > 0);
+          }
+          if (!Array.isArray(uris)) {
+            uris = [uris];
+          }
+
+          for (const uri of uris) {
+            const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
+            try {
+              const tsiData = await retrieve_resource(
+                this.originator, target.host, target.port, cleanUri, ''
+              );
+              if (tsiData['m2m:tsi']) {
+                node.tasks.push(this.convertNode(tsiData['m2m:tsi'], 'TSI', 0, false));
+              }
+            } catch (err) {
+              console.warn(`[loadInstances] Failed to load TSI: ${cleanUri}`);
+            }
+          }
+          node.instancesLoaded = true;
+          node.instancesLoadedAll = (uris.length < limit);
+          console.log(`[loadInstances] Loaded ${uris.length} TSIs for ${node.attrs?.rn}`);
+        } catch (error) {
+          console.warn(`[loadInstances] No TSIs for ${node.attrs?.rn}`);
+        }
+      }
+
       // 자식 재귀
       if (node.tasks) {
         for (const child of node.tasks) {
@@ -702,7 +744,7 @@ export default {
     async loadAllInstances(element) {
       console.log("[loadAllInstances] Loading all instances for:", element.attrs?.rn);
       // 기존 CIN/FCIN 제거 후 전체 재로드
-      element.tasks = element.tasks.filter(t => t.ty !== 4 && t.ty !== 58);
+      element.tasks = element.tasks.filter(t => t.ty !== 4 && t.ty !== 58 && t.ty !== 30);
       element.instancesLoaded = false;
       await this.loadInstancesForTree(element, 1000);
       element.instancesLoadedAll = true;
@@ -849,7 +891,7 @@ async loadResources() {
         // CSE 직속 CNT/FCNT에 플래그 (돋보기 표시용)
         if (convertedData[0].tasks) {
           convertedData[0].tasks.forEach(child => {
-            if (child.ty === 3 || child.ty === 28) {
+            if (child.ty === 3 || child.ty === 28 || child.ty === 29) {
               child.cseDirectChild = true;
             }
           });
@@ -898,11 +940,17 @@ async loadResources() {
     if (obj['m2m:fcin'] && !Array.isArray(obj['m2m:fcin']) && typeof obj['m2m:fcin'] === 'object') {
       obj['m2m:fcin'] = [obj['m2m:fcin']];
     }
+    if (obj['m2m:tsi'] && !Array.isArray(obj['m2m:tsi']) && typeof obj['m2m:tsi'] === 'object') {
+      obj['m2m:tsi'] = [obj['m2m:tsi']];
+    }
     if (Array.isArray(obj['m2m:cin']) && obj['m2m:cin'].length > 0) {
       obj['m2m:cin'] = obj['m2m:cin'].slice(-1);
     }
     if (Array.isArray(obj['m2m:fcin']) && obj['m2m:fcin'].length > 0) {
       obj['m2m:fcin'] = obj['m2m:fcin'].slice(-1);
+    }
+    if (Array.isArray(obj['m2m:tsi']) && obj['m2m:tsi'].length > 0) {
+      obj['m2m:tsi'] = obj['m2m:tsi'].slice(-1);
     }
     for (const key of Object.keys(obj)) {
       if (Array.isArray(obj[key])) {
@@ -995,6 +1043,12 @@ async loadResources() {
         if (node.ty === 28 && node.cni !== undefined) {
             result.childCount = node.cni;
             result.childType = 58; // FCIN
+        }
+
+        // TS의 경우 cni로 TSI 개수 저장
+        if (node.ty === 29 && node.cni !== undefined) {
+            result.childCount = node.cni;
+            result.childType = 30; // TSI
         }
 
         // 자식노드에 재귀적 요청
@@ -2095,12 +2149,12 @@ async loadResources() {
 
       const stats = { total: 0, created: 0, reused: 0, errors: 0 };
 
-      // 재귀적으로 모든 CNT 찾기
+      // 재귀적으로 모든 CNT/TS 찾기
       const findAllCNTs = (node, parentPath = '') => {
         const cnts = [];
 
-        if (node.ty === 3) {
-          // CNT 타입인 경우
+        if (node.ty === 3 || node.ty === 29) {
+          // CNT 또는 TS 타입인 경우
           const fullPath = parentPath ? `${parentPath}/${node.attrs.rn}` : node.attrs.rn;
           cnts.push({ name: node.attrs.rn, path: fullPath });
         }
@@ -2268,7 +2322,7 @@ async loadResources() {
           // 타입 매핑
           const typeMap = {
             'AE': 2, 'CNT': 3, 'CIN': 4, 'ACP': 1,
-            'GRP': 9, 'SUB': 23, 'FCNT': 28, 'FCIN': 58
+            'GRP': 9, 'SUB': 23, 'FCNT': 28, 'FCIN': 58, 'TS': 29, 'TSI': 30
           };
           resourceType = typeMap[typeStr];
           break;
@@ -2296,6 +2350,12 @@ async loadResources() {
       const resourceName = pathParts[pathParts.length - 1];
       const existing = this.findResourceByName(parent.tasks, resourceName);
       if (existing) {
+        // 디자인 툴에서 자체 생성한 리소스면 노티 무시
+        const notifRI = resourceData?.ri;
+        if (notifRI && existing.attrs?.ri === notifRI) {
+          console.log('[NOTIFICATION] Self-created resource, skipping:', resourceName);
+          return;
+        }
         console.log('[NOTIFICATION] Resource already exists, adding flash effect');
         this.addFlashingEffect(uri);
         return;
@@ -2328,6 +2388,32 @@ async loadResources() {
             const index = parent.tasks.findIndex(t => t.id === cinToRemove.id);
             if (index !== -1) {
               console.log(`[NOTIFICATION] Removing old CIN: ${cinToRemove.name} (ct: ${cinToRemove.attrs?.ct})`);
+              parent.tasks.splice(index, 1);
+            }
+          }
+        }
+      }
+
+      // TSI 제한 로직: 부모가 TS이고 새로운 리소스가 TSI인 경우
+      if (resourceType === 30 && parent.ty === 29) {
+        const currentTSIs = parent.tasks.filter(task => task.ty === 30);
+        console.log(`[NOTIFICATION] TS ${parent.name} currently has ${currentTSIs.length} TSI(s)`);
+
+        if (currentTSIs.length >= 5) {
+          const tsisToRemove = currentTSIs.length - 4;
+          console.log(`[NOTIFICATION] Removing ${tsisToRemove} oldest TSI(s) to maintain limit of 5`);
+
+          const sortedTSIs = currentTSIs.sort((a, b) => {
+            const ctA = a.attrs?.ct || '0';
+            const ctB = b.attrs?.ct || '0';
+            return ctA.localeCompare(ctB);
+          });
+
+          for (let i = 0; i < tsisToRemove; i++) {
+            const tsiToRemove = sortedTSIs[i];
+            const index = parent.tasks.findIndex(t => t.id === tsiToRemove.id);
+            if (index !== -1) {
+              console.log(`[NOTIFICATION] Removing old TSI: ${tsiToRemove.name} (ct: ${tsiToRemove.attrs?.ct})`);
               parent.tasks.splice(index, 1);
             }
           }
@@ -2611,6 +2697,41 @@ async loadResources() {
           } catch (error) {
             console.log('[LOAD CHILDREN] No SUB found or error:', error.message);
           }
+        } else if (element.ty === 29) {
+          // TS: TSI(최신 5개) + SUB(전체) 분리 로드
+          console.log(`[LOAD CHILDREN] Loading TSI and SUB separately for TS...`);
+
+          // 1. TSI 로드 (ty=30, 최신 5개만)
+          try {
+            const tsiUriList = await retrieve_resource(
+              this.originator,
+              target.host,
+              target.port,
+              resourcePath,
+              'fu=1&ty=30&lim=5'  // TSI 타입, 최신 5개
+            );
+            const tsiUris = tsiUriList['m2m:uril'] || [];
+            console.log(`[LOAD CHILDREN] Found ${tsiUris.length} TSI(s):`, tsiUris);
+            childUris.push(...tsiUris);
+          } catch (error) {
+            console.log('[LOAD CHILDREN] No TSI found or error:', error.message);
+          }
+
+          // 2. SUB 로드 (ty=23, 전체)
+          try {
+            const subUriList = await retrieve_resource(
+              this.originator,
+              target.host,
+              target.port,
+              resourcePath,
+              'fu=1&ty=23'  // SUB 타입, 전체
+            );
+            const subUris = subUriList['m2m:uril'] || [];
+            console.log(`[LOAD CHILDREN] Found ${subUris.length} SUB(s):`, subUris);
+            childUris.push(...subUris);
+          } catch (error) {
+            console.log('[LOAD CHILDREN] No SUB found or error:', error.message);
+          }
         } else {
           // CNT가 아닌 경우 기존 로직
           console.log(`[LOAD CHILDREN] Discovering direct children...`);
@@ -2674,22 +2795,22 @@ async loadResources() {
 
               console.log(`[LOAD CHILDREN] ${uri}: ty=${resourceNode.ty}, cbs=${cbs}`);
 
-              // hasChildren은 오직 CNT(ty=3)이면서 cbs > 0인 경우만 true
+              // hasChildren은 CNT(ty=3), FCNT(ty=28), TS(ty=29)이면서 cbs > 0인 경우만 true
               hasChildren = false;
-              if (resourceNode.ty === 3) {
+              if (resourceNode.ty === 3 || resourceNode.ty === 28 || resourceNode.ty === 29) {
                 if (typeof cbs === 'number' && cbs > 0) {
                   hasChildren = true;
-                  console.log(`  → CNT with cbs=${cbs}, hasChildren=true`);
+                  console.log(`  → ty=${resourceNode.ty} with cbs=${cbs}, hasChildren=true`);
                 } else if (cbs !== undefined && cbs !== null && cbs !== '' && !isNaN(Number(cbs))) {
                   const cbsNum = Number(cbs);
                   hasChildren = cbsNum > 0;
-                  console.log(`  → CNT with cbs=${cbsNum} (converted), hasChildren=${hasChildren}`);
+                  console.log(`  → ty=${resourceNode.ty} with cbs=${cbsNum} (converted), hasChildren=${hasChildren}`);
                 } else {
-                  console.log(`  → CNT with no cbs, hasChildren=false`);
+                  console.log(`  → ty=${resourceNode.ty} with no cbs, hasChildren=false`);
                 }
               } else {
                 // 나머지 리소스는 hasChildren = false (토글 없이 항상 표시)
-                console.log(`  → Not CNT, hasChildren=false`);
+                console.log(`  → Not CNT/FCNT/TS, hasChildren=false`);
               }
 
               const childTypeName = this.getTypeNameFromTy(resourceNode.ty);
@@ -2738,6 +2859,8 @@ async loadResources() {
         9: 'GRP',
         23: 'SUB',
         28: 'FCNT',
+        29: 'TS',
+        30: 'TSI',
         58: 'FCIN'
       };
       return typeMap[ty] || 'UNKNOWN';
@@ -2754,6 +2877,8 @@ async loadResources() {
         9: 'm2m:grp',  // GRP
         23: 'm2m:sub', // SUB
         28: 'm2m:fcnt', // FCNT
+        29: 'm2m:ts',  // TS
+        30: 'm2m:tsi', // TSI
         58: 'm2m:fcin'  // FCIN
       };
       return typeMap[ty] || 'm2m:unknown';
@@ -2833,6 +2958,13 @@ async loadResources() {
             } else if (node.cbs !== undefined && node.cbs > 0) {
                 hasChildren = true;
             }
+        } else if (node.ty === 29) {
+            // TS의 경우: cni(TSI count) 또는 cbs를 확인
+            if (node.cni !== undefined && node.cni > 0) {
+                hasChildren = true;
+            } else if (node.cbs !== undefined && node.cbs > 0) {
+                hasChildren = true;
+            }
         }
 
         const result = {
@@ -2860,6 +2992,12 @@ async loadResources() {
         if (node.ty === 28 && node.cni !== undefined) {
             result.childCount = node.cni;
             result.childType = 58; // FCIN
+        }
+
+        // TS의 경우 cni로 TSI 개수 저장 (표시용)
+        if (node.ty === 29 && node.cni !== undefined) {
+            result.childCount = node.cni;
+            result.childType = 30; // TSI
         }
 
         return result;
