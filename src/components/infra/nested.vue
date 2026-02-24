@@ -218,16 +218,16 @@ export default {
           };
         case RT_CNT:
           return {
-            border: "2px solid #FF9800",
-            backgroundColor: "rgba(255, 152, 0, 0.1)",
+            border: "2px solid #E67E22",
+            backgroundColor: "rgba(230, 126, 34, 0.12)",
             padding: "6px",
             borderRadius: "10px",
             justifyContent: 'center'
           };
         case RT_CIN:
           return {
-            border: "2px solid #FFB74D",
-            backgroundColor: "rgba(255, 183, 77, 0.1)",
+            border: "2px solid #F0C27A",
+            backgroundColor: "rgba(240, 194, 122, 0.15)",
             padding: "6px",
             borderRadius: "10px",
             justifyContent: 'center'
@@ -257,16 +257,16 @@ export default {
           };
         case RT_FCNT:
           return {
-            border: "2px solid #E53935",
-            backgroundColor: "rgba(229, 57, 53, 0.1)",
+            border: "2px solid #C0392B",
+            backgroundColor: "rgba(192, 57, 43, 0.1)",
             padding: "6px",
             borderRadius: "10px",
             justifyContent: 'center'
           };
         case RT_FCIN:
           return {
-            border: "2px solid #EF9A9A",
-            backgroundColor: "rgba(239, 154, 154, 0.1)",
+            border: "2px solid #F1948A",
+            backgroundColor: "rgba(241, 148, 138, 0.18)",
             padding: "6px",
             borderRadius: "10px",
             justifyContent: 'center'
@@ -566,7 +566,7 @@ export default {
 .resourceBox p {
   outline: 1px;
   margin: 4px;
-  border-radius: 5px;
+  border-radius: 8px;
   border: 1px solid #ccc;
   background-color: #fff;
   color: #000;
@@ -583,6 +583,12 @@ export default {
   justify-content: center;
   padding: 0 12px;
   white-space: nowrap;
+  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.1), -2px -2px 6px rgba(255, 255, 255, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.resourceBox p:hover {
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.15), -3px -3px 8px rgba(255, 255, 255, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
 }
 .icon {
   width: 20px;

@@ -110,7 +110,7 @@ export async function make_request_resource(currentNode, path, targetIP, origina
 
     // 성공적으로 생성되면 플래그 설정
     currentNode.createdOnServer = true;
-    console.log("✅ Resource created and marked: ", currentNode.attrs.rn);
+    console.log("[CREATE] Resource created:", currentNode.attrs.rn);
 
     // 서버 응답에서 ri (Resource ID) 추출하여 저장
     if (response) {
@@ -120,12 +120,12 @@ export async function make_request_resource(currentNode, path, targetIP, origina
         const ri = response[resourceKey].ri;
         if (ri) {
           currentNode.attrs.ri = ri;
-          console.log("✅ Saved RI:", ri);
+          console.log("[CREATE] Saved RI:", ri);
         }
       }
     }
   } catch (error) {
-    console.error("❌ Failed to create resource:", error);
+    console.error("[CREATE] Failed to create resource:", error);
     throw error;
   }
 

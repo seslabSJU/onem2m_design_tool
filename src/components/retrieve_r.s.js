@@ -61,7 +61,7 @@ async function http_resource_retrieve(originator, host, port, path, filterCriter
     });
     const endTime = performance.now();
 
-    console.log(`[RETRIEVE] ✅ Success in ${(endTime - startTime).toFixed(2)}ms`);
+    console.log(`[RETRIEVE] Success in ${(endTime - startTime).toFixed(2)}ms`);
     console.log('[RETRIEVE] Data:', initialResponse.data);
 
     if (initialResponse.data) {
@@ -69,7 +69,7 @@ async function http_resource_retrieve(originator, host, port, path, filterCriter
     }
     return {};
   } catch (error) {
-    console.error('[RETRIEVE] ❌ Failed:', error);
+    console.error('[RETRIEVE] Failed:', error);
     console.error('[RETRIEVE] URL:', initialUrl);
     if (error.response) {
       console.error('[RETRIEVE] Response:', error.response.status, error.response.data);

@@ -3,11 +3,16 @@
     <navBar class="nav">
       <!-- 설정(톱니바퀴) 아이콘 — 타이틀 바 -->
       <div class="settings-wrapper">
-        <span
+        <button
           class="settings-gear"
           @click="showSettings = !showSettings"
           title="Settings"
-        >⚙️</span>
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
 
         <!-- 설정 드롭다운 패널 -->
         <div v-if="showSettings" class="settings-panel">
@@ -122,6 +127,14 @@
   </div>
   <div class="body">
     <div class="canvas">
+      <button class="canvas-expand-btn" @click="canvasExpanded = true" title="전체 보기">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      </button>
         <nestedDraggable
           :tasks="cse1"
           style="padding-left: 0px;"
@@ -148,13 +161,30 @@
   
 
     <div class="rightTab">
-      <nestedDraggable
-        class="right_dragArea resources list-items"
-        style="padding-left: 0px; padding-bottom: 10px;"
-        :tasks="resources"
-        :group="{name:'resources', pull: 'clone', put: false}"
-        item-key="id"
-      ></nestedDraggable>
+      <div class="palette-label">Resources</div>
+      <div class="right_dragArea resources list-items" style="padding-bottom: 10px;">
+        <div class="resource-section-label">Application</div>
+        <nestedDraggable
+          style="padding-left: 0px;"
+          :tasks="resApplication"
+          :group="{name:'resources', pull: 'clone', put: false}"
+          item-key="id"
+        ></nestedDraggable>
+        <div class="resource-section-label has-divider">Data</div>
+        <nestedDraggable
+          style="padding-left: 0px;"
+          :tasks="resData"
+          :group="{name:'resources', pull: 'clone', put: false}"
+          item-key="id"
+        ></nestedDraggable>
+        <div class="resource-section-label has-divider">Management</div>
+        <nestedDraggable
+          style="padding-left: 0px;"
+          :tasks="resManagement"
+          :group="{name:'resources', pull: 'clone', put: false}"
+          item-key="id"
+        ></nestedDraggable>
+      </div>
 
       <div class="trashcan">
         <draggable
@@ -201,22 +231,19 @@
             <div class="delete-item">{{ getElementLabel(element) }}</div>
           </template>
         </draggable>
-        <div class="delete-label">Resource Delete</div>
+        <div class="delete-label">Delete Resource</div>
       </div>
 
-      <div class="flex-direction: column">
-        <div class="btn button" style="background-color: aqua;" @click="createResourceTree">
+      <div class="action-buttons">
+        <div class="btn button action-btn" @click="createResourceTree">
           Create ResourceTree
         </div>
-        <br /> <br /> 
-        <div class="btn button" style="background-color: aquamarine;" @click="saveResourceTree">
+        <div class="btn button action-btn" @click="saveResourceTree">
           Export to TextFile
         </div>
-        <br /> <br />
-        <div class="btn button" style="background-color: lightblue; " @click="loadFile">
+        <div class="btn button action-btn" @click="loadFile">
           Importing TextFile
         </div>
-        <br /> <br />
       </div>
     </div>
 
@@ -266,16 +293,54 @@
     </div>
       
   </div>
-  <rawDisplayer class="col-4" :value="cse1" title="List 1" />
+  <rawDisplayer class="col-4" :value="cse1" title="List 1" style="margin-left: 20px;" />
+
+  <!-- 캔버스 전체보기 모달 -->
+  <div v-if="canvasExpanded" class="fullview-overlay" @click="canvasExpanded = false">
+    <div class="fullview-modal" @click.stop>
+      <button class="fullview-close" @click="canvasExpanded = false">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div class="fullview-body">
+        <nestedDraggable
+          :tasks="cse1"
+          style="padding-left: 0px;"
+          :group="{
+            name: 'resourceTree',
+            pull: true,
+            put: true
+          }"
+          :childRT="[2, 9, 1, 3, 4, 23]"
+          :min-height="200"
+          item-key="id"
+          @clicked="(element) => {
+            this.setAttributes(element);
+          }"
+          @move="(evt) => { this.isDragging = true; }"
+          @add="handleAdd"
+          @drag-start="handleDragStart"
+          @toggle-expand="handleToggleExpand"
+          @zoom-view="openZoomView"
+          :dragoverBubble="true"
+          class="dragArea resourceTree zoom-tree"
+        ></nestedDraggable>
+      </div>
+    </div>
+  </div>
 
   <!-- 확대 뷰 모달 -->
-  <div v-if="showZoomView" class="zoom-view-overlay" @click="closeZoomView">
-    <div class="zoom-view-container" @click.stop>
-      <div class="zoom-view-header">
-        <h2>{{ zoomedAE?.attrs?.rn || 'AE' }} - Expanded View</h2>
-        <button class="close-btn" @click="closeZoomView">✕</button>
-      </div>
-      <div class="zoom-view-content">
+  <div v-if="showZoomView" class="fullview-overlay" @click="closeZoomView">
+    <div class="fullview-modal" @click.stop>
+      <button class="fullview-close" @click="closeZoomView">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div class="fullview-body">
         <nestedDraggable
           :tasks="zoomedTree"
           style="padding-left: 0px;"
@@ -341,10 +406,24 @@ export default {
           { name: "AE", ty: RT.AE },
           { name: "CNT", ty: RT.CNT },
           { name: "CIN", ty: RT.CIN },
-          { name: "GRP", ty: RT.GRP },
-          { name: "SUB", ty: RT.SUB },
           { name: "FCNT", ty: RT.FCNT },
           { name: "FCIN", ty: RT.FCIN },
+          { name: "GRP", ty: RT.GRP },
+          { name: "SUB", ty: RT.SUB },
+      ],
+      resApplication: [
+          { name: "AE", ty: RT.AE },
+      ],
+      resData: [
+          { name: "CNT", ty: RT.CNT },
+          { name: "CIN", ty: RT.CIN },
+          { name: "FCNT", ty: RT.FCNT },
+          { name: "FCIN", ty: RT.FCIN },
+      ],
+      resManagement: [
+          { name: "ACP", ty: RT.ACP },
+          { name: "GRP", ty: RT.GRP },
+          { name: "SUB", ty: RT.SUB },
       ]
       ,
       attrSetting : false,
@@ -393,7 +472,8 @@ export default {
       // 확대 뷰 관련
       showZoomView: false,
       zoomedAE: null,
-      zoomedClone: null
+      zoomedClone: null,
+      canvasExpanded: false
     }
   },
 
@@ -651,7 +731,7 @@ export default {
         element.attrs.rn = rn;
         this.updateFullPaths();
         this.syncSessionStorage();
-        console.log('[UPDATE-RN] ✅ Resource name updated');
+        console.log('[UPDATE-RN] Resource name updated');
       } else {
         console.error('[UPDATE-RN] Element not found:', id);
       }
@@ -800,10 +880,10 @@ async loadResources() {
         countAll(convertedData[0]);
       }
 
-      console.log(`[loadResources] ✅ Loaded ${totalResources} resources in ${(endTime - startTime).toFixed(2)}ms`);
+      console.log(`[loadResources] Loaded ${totalResources} resources in ${(endTime - startTime).toFixed(2)}ms`);
 
     } catch (error) {
-      console.error("[loadResources] ❌ Failed to load resources:", error);
+      console.error("[loadResources] Failed to load resources:", error);
       alert("Failed to load resources. See console for details.");
     }
   },
@@ -1511,34 +1591,98 @@ async loadResources() {
     },
 
     async handleDeleteZoneChange(evt) {
-      console.log('🗑️ [handleDeleteZoneChange] Called with event:', evt);
+      console.log('[DELETE] handleDeleteZoneChange called');
 
       if (!evt || !evt.added || !evt.added.element) {
-        console.log('🗑️ [handleDeleteZoneChange] No element to delete, returning early');
         return;
       }
 
       const element = evt.added.element;
       const bufferIndex = evt.added.newIndex;
+      const resourceName = element.attrs?.rn || element.name || 'Unknown';
+      const hasChildren = element.tasks && element.tasks.length > 0;
 
-      console.log('🗑️ [handleDeleteZoneChange] Element to delete:', {
-        name: element.name,
-        rn: element?.attrs?.rn,
-        ri: element?.attrs?.ri,
-        createdOnServer: element.createdOnServer,
-        fullPath: element.fullPath
-      });
+      console.log('[DELETE] target:', resourceName, 'ty:', element.ty, 'children:', hasChildren ? element.tasks.length : 0);
 
+      // 버퍼에서 즉시 제거
       if (typeof bufferIndex === 'number' && bufferIndex > -1) {
         this.deleteBuffer.splice(bufferIndex, 1);
       } else {
         this.deleteBuffer.length = 0;
       }
 
+      // CSE(ty=5) 드롭 → 하위 리소스 전체 삭제
+      if (element.ty === 5) {
+        if (!hasChildren) {
+          alert(`"${resourceName}" 하위에 삭제할 리소스가 없습니다.`);
+          this.restoreTreeSnapshot();
+          this.deleteBuffer.length = 0;
+          this.isDragging = false;
+          return;
+        }
+        const confirmed = confirm(
+          `"${resourceName}"과 하위 리소스를 삭제하시겠습니까?\n\n※ CSE 자체는 삭제되지 않습니다.`
+        );
+        if (!confirmed) {
+          this.restoreTreeSnapshot();
+          this.deleteBuffer.length = 0;
+          this.isDragging = false;
+          return;
+        }
+        try {
+          const children = [...(element.tasks || [])];
+          let failCount = 0;
+          for (const child of children) {
+            try {
+              await this.deleteResourceFromServer(child);
+              console.log('[DELETE] child deleted:', child.attrs?.rn || child.name);
+            } catch (err) {
+              failCount++;
+              console.error('[DELETE] child delete failed:', child.attrs?.rn, err);
+            }
+          }
+          element.tasks = [];
+          // CSE를 트리에 다시 넣기
+          if (!this.cse1.find(n => n.id === element.id)) {
+            this.cse1.push(element);
+          }
+          if (failCount > 0) {
+            alert(`"${resourceName}" 하위 리소스 삭제 완료 (${failCount}개 실패)`);
+          } else {
+            alert(`"${resourceName}" 하위 리소스가 모두 삭제되었습니다.`);
+          }
+          this.updateFullPaths();
+          this.syncSessionStorage();
+        } catch (error) {
+          console.error('[DELETE] CSE children delete failed:', error);
+          alert('리소스 삭제에 실패했습니다.');
+        } finally {
+          this.deleteBuffer.length = 0;
+          this.draggedElementInfo = null;
+          this.draggedElementPath = '';
+          this.isDragging = false;
+          this.treeSnapshotBeforeDrag = null;
+        }
+        return;
+      }
+
+      // 일반 리소스 → 확인 팝업 (하위 리소스 유무에 따라 메시지 구분)
+      const confirmMsg = hasChildren
+        ? `"${resourceName}"과 하위 리소스를 삭제하시겠습니까?`
+        : `"${resourceName}" 리소스를 삭제하시겠습니까?`;
+      if (!confirm(confirmMsg)) {
+        this.restoreTreeSnapshot();
+        this.deleteBuffer.length = 0;
+        this.isDragging = false;
+        return;
+      }
+
       try {
-        console.log('🗑️ [handleDeleteZoneChange] Calling deleteResourceFromServer...');
         await this.deleteResourceFromServer(element);
-        console.log('🗑️ [handleDeleteZoneChange] Delete successful, updating UI...');
+        const successMsg = hasChildren
+          ? `"${resourceName}"과 하위 리소스가 삭제되었습니다.`
+          : `"${resourceName}" 리소스가 삭제되었습니다.`;
+        alert(successMsg);
 
         this.updateFullPaths();
         this.syncSessionStorage();
@@ -1548,11 +1692,10 @@ async loadResources() {
           this.attrSetting = false;
         }
       } catch (error) {
-        console.error('🗑️ [handleDeleteZoneChange] ❌ Resource delete failed:', error);
+        console.error('[DELETE] failed:', resourceName, error);
         alert(error?.message || '리소스 삭제에 실패했습니다.');
         this.restoreTreeSnapshot();
       } finally {
-        console.log('🗑️ [handleDeleteZoneChange] Cleanup...');
         this.deleteBuffer.length = 0;
         this.draggedElementInfo = null;
         this.draggedElementPath = '';
@@ -1562,48 +1705,32 @@ async loadResources() {
     },
 
     async deleteResourceFromServer(element) {
-      // Validate element
       if (!element) {
         throw new Error('삭제할 리소스를 찾을 수 없습니다.');
       }
 
-      console.log('[DELETE] Starting deletion process for:', {
-        name: element.name,
-        rn: element?.attrs?.rn,
-        ri: element?.attrs?.ri,
-        createdOnServer: element.createdOnServer,
-        fullPath: element.fullPath
-      });
-
-      // Check if we have enough information to attempt deletion
+      const rn = element?.attrs?.rn || element.name;
       const hasRI = !!element?.attrs?.ri;
       const hasRN = !!element?.attrs?.rn;
       const hasFullPath = !!element.fullPath;
       const isFromServer = element.createdOnServer;
 
-      // Skip deletion ONLY if:
-      // 1. It's not from server AND
-      // 2. Has no RI AND
-      // 3. Has no RN AND
-      // 4. Has no fullPath
+      console.log('[DELETE] start:', rn, { ri: element?.attrs?.ri, fullPath: element.fullPath, createdOnServer: isFromServer });
+
+      // 서버에 생성된 적 없고 경로 정보도 없으면 스킵
       if (!isFromServer && !hasRI && !hasRN && !hasFullPath) {
-        console.warn('[DELETE] ⚠️ Skipping server delete - no resource information available');
-        console.warn('[DELETE] This appears to be a template resource that was never created.');
+        console.warn('[DELETE] skip - no resource info (template resource)');
         return;
       }
 
-      // If we have some information, try to delete
       if (!isFromServer && (hasRI || hasRN || hasFullPath)) {
-        console.warn('[DELETE] ⚠️ Resource not marked as createdOnServer, but has resource info');
-        console.warn('[DELETE] Will attempt deletion anyway...');
+        console.warn('[DELETE] not marked as createdOnServer, attempting anyway');
       }
 
-      // Validate target IP
       if (!this.targetIP || this.targetIP === '') {
         throw new Error('CSE IP 주소를 먼저 입력하세요.');
       }
 
-      // Parse target URL
       const target = this.parseTargetUrl(this.targetIP);
       if (!target) {
         throw new Error('CSE 주소 형식이 올바르지 않습니다.');
@@ -1613,30 +1740,14 @@ async loadResources() {
         throw new Error('현재는 HTTP만 지원합니다.');
       }
 
-      // Build resource path from available information
+      // Build resource path (priority: fullPath > rn > ri)
       let resourcePath = '';
-      let pathSource = '';
-
-      // Priority 1: Use fullPath (most accurate hierarchical path)
       if (element.fullPath || this.draggedElementPath) {
-        const fullPath = element.fullPath || this.draggedElementPath;
-        // fullPath already contains the complete hierarchy
-        // Example: "TinyIoT/TinyFarm-TEST/Sensors/CO2/snclkcnknknkn"
-        resourcePath = fullPath;
-        pathSource = 'fullPath';
-        console.log('[DELETE] ✅ Using fullPath:', resourcePath);
-      }
-      // Priority 2: Use rn (resource name) - works for direct children
-      else if (element?.attrs?.rn) {
+        resourcePath = element.fullPath || this.draggedElementPath;
+      } else if (element?.attrs?.rn) {
         resourcePath = element.attrs.rn;
-        pathSource = 'RN';
-        console.log('[DELETE] ⚠️ Using RN (no fullPath available):', resourcePath);
-      }
-      // Priority 3: Use ri as last resort (but often doesn't work with TinyIoT)
-      else if (element?.attrs?.ri) {
+      } else if (element?.attrs?.ri) {
         resourcePath = element.attrs.ri;
-        pathSource = 'RI';
-        console.log('[DELETE] ⚠️ Using RI (last resort):', resourcePath);
       }
 
       if (!resourcePath) {
@@ -1646,41 +1757,17 @@ async loadResources() {
       // Combine basePath with resourcePath
       const basePath = target.basePath || '';
       let finalPath;
-
-      // If resourcePath already includes basePath, use as-is
       if (resourcePath.startsWith(basePath + '/') || resourcePath === basePath) {
         finalPath = resourcePath;
-        console.log('[DELETE] ✅ Path already complete (contains basePath)');
-      }
-      // If resourcePath starts with basePath (but no slash), still use as-is
-      else if (basePath && resourcePath.startsWith(basePath)) {
+      } else if (basePath && resourcePath.startsWith(basePath)) {
         finalPath = resourcePath;
-        console.log('[DELETE] ✅ Path already complete (starts with basePath)');
-      }
-      // Otherwise, combine basePath + resourcePath
-      else {
+      } else {
         finalPath = basePath ? `${basePath}/${resourcePath}` : resourcePath;
-        console.log('[DELETE] ⚙️ Combined basePath + resourcePath');
       }
 
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('[DELETE] 🔍 Path construction:');
-      console.log('  📌 Source:', pathSource);
-      console.log('  📌 Target IP:', this.targetIP);
-      console.log('  📌 Parsed basePath:', basePath);
-      console.log('  📌 Resource path:', resourcePath);
-      console.log('  📌 Final path:', finalPath);
-      console.log('  📌 Full URL:', `${target.protocol}://${target.host}:${target.port}/${finalPath}`);
-      console.log('  📌 Element info:', {
-        rn: element?.attrs?.rn,
-        ri: element?.attrs?.ri,
-        fullPath: element.fullPath,
-        createdOnServer: element.createdOnServer
-      });
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('[DELETE] request:', finalPath);
 
       try {
-        console.log('[DELETE] 🚀 Sending DELETE request to:', finalPath);
         await delete_resource(
           this.originator,
           target.protocol,
@@ -1689,24 +1776,16 @@ async loadResources() {
           finalPath
         );
 
-        console.log('[DELETE] Success!');
-        alert('리소스가 성공적으로 삭제되었습니다.');
-
-        // Mark as not created on server
+        console.log('[DELETE] success:', rn);
         element.createdOnServer = false;
         this.treeSnapshotBeforeDrag = null;
 
       } catch (error) {
-        console.error('[DELETE] Failed:', error);
+        console.error('[DELETE] failed:', rn, error?.response?.status || error.message);
 
-        // Check if it's a 404 (resource not found)
         if (error?.response?.status === 404) {
-          const confirmDelete = confirm(
-            '서버에서 리소스를 찾을 수 없습니다.\n' +
-            '로컬 트리에서만 삭제하시겠습니까?'
-          );
-          if (confirmDelete) {
-            console.log('[DELETE] Resource not found on server, removing from local tree only');
+          if (confirm('서버에서 리소스를 찾을 수 없습니다.\n로컬 트리에서만 삭제하시겠습니까?')) {
+            console.log('[DELETE] removed from local tree only:', rn);
             element.createdOnServer = false;
             return;
           }
@@ -1773,7 +1852,7 @@ async loadResources() {
           console.log(`[REALTIME] Subscription stats: ${stats.created} created, ${stats.reused} reused, ${stats.errors} errors out of ${stats.total} CNTs`);
 
           this.realtimeSyncEnabled = true;
-          console.log('[REALTIME] ✅ Real-time sync enabled');
+          console.log('[REALTIME] Real-time sync enabled');
         } catch (error) {
           console.error('[REALTIME] Failed to enable real-time sync:', error);
           const errorMsg = error?.message || error?.toString() || '알 수 없는 오류';
@@ -1786,7 +1865,7 @@ async loadResources() {
         this.disconnectMQTT();
         // NOTE: Subscription은 삭제하지 않고 재사용을 위해 유지
         this.realtimeSyncEnabled = false;
-        console.log('[REALTIME] ✅ Real-time sync disabled');
+        console.log('[REALTIME] Real-time sync disabled');
       }
     },
 
@@ -1810,7 +1889,7 @@ async loadResources() {
         });
 
         this.mqttClient.on('connect', () => {
-          console.log('[MQTT] ✅ Connected to broker');
+          console.log('[MQTT] Connected to broker');
 
           // 토픽 구독
           this.mqttClient.subscribe(this.mqttTopic, (err) => {
@@ -1818,7 +1897,7 @@ async loadResources() {
               console.error('[MQTT] Subscription failed:', err);
               reject(new Error('MQTT 구독 실패'));
             } else {
-              console.log('[MQTT] ✅ Subscribed to topic:', this.mqttTopic);
+              console.log('[MQTT] Subscribed to topic:', this.mqttTopic);
               resolve();
             }
           });
@@ -1941,7 +2020,7 @@ async loadResources() {
                     this.subscriptionResourceName = subName;
                     this.subscriptionCreated = true;
                   }
-                  console.log('[SUBSCRIPTION] ✅ Reusing existing MQTT subscription:', subName, 'at', targetPath);
+                  console.log('[SUBSCRIPTION] Reusing existing MQTT subscription:', subName, 'at', targetPath);
                   return { success: true, subscriptionName: subName, reused: true };
                 }
                 // 다른 호스트의 sub은 건드리지 않고 스킵
@@ -1998,7 +2077,7 @@ async loadResources() {
           this.subscriptionCreated = true;
           this.subscriptionResourceName = subscriptionName;
         }
-        console.log('[SUBSCRIPTION] ✅ Subscription created:', subscriptionName, 'at', targetPath);
+        console.log('[SUBSCRIPTION] Subscription created:', subscriptionName, 'at', targetPath);
         return { success: true, subscriptionName, reused: false, result };
       } catch (error) {
         console.error('[SUBSCRIPTION] Failed to create:', error);
@@ -2007,7 +2086,7 @@ async loadResources() {
     },
 
     async createSubscriptionsForAllCNTs() {
-      console.log('[SUBSCRIPTION] 🚀 Starting to create subscriptions for all CNTs...');
+      console.log('[SUBSCRIPTION] Starting to create subscriptions for all CNTs...');
 
       if (!this.cse1 || !Array.isArray(this.cse1) || this.cse1.length === 0 || !this.cse1[0] || !this.cse1[0].tasks) {
         console.log('[SUBSCRIPTION] No resources loaded yet');
@@ -2069,7 +2148,7 @@ async loadResources() {
         }
       }
 
-      console.log('[SUBSCRIPTION] ✅ Subscription creation completed:', stats);
+      console.log('[SUBSCRIPTION] Subscription creation completed:', stats);
       return stats;
     },
 
@@ -2099,7 +2178,7 @@ async loadResources() {
         // Check if rep has resource data
         const resourceKey = Object.keys(rep).find(key => key.startsWith('m2m:'));
         if (resourceKey) {
-          console.log('[TRANSFORM] ⚠️ TinyIoT bug detected: DELETE(' + net + ') -> CREATE(1)');
+          console.log('[TRANSFORM] TinyIoT bug detected: DELETE(' + net + ') -> CREATE(1)');
           net = 1; // CREATE_OF_DIRECT_CHILD_RESOURCE
         }
       }
@@ -2265,7 +2344,7 @@ async loadResources() {
       this.updateFullPaths();
       this.syncSessionStorage();
 
-      console.log('[NOTIFICATION] ✅ Resource added to tree:', resourceName);
+      console.log('[NOTIFICATION] Resource added to tree:', resourceName);
     },
 
     handleResourceDeleted(uri) {
@@ -2306,7 +2385,7 @@ async loadResources() {
         // 번쩍이는 효과가 활성화되어 있으면 빨간불 효과 추가 후 3초 뒤 삭제
         if (this.flashingEffectEnabled) {
           resourceToDelete.flashing = true;
-          console.log('[NOTIFICATION] ⚠️ Resource will be deleted after flashing:', resourceName);
+          console.log('[NOTIFICATION] Resource will be deleted after flashing:', resourceName);
         }
 
         // 효과 활성화 시 3초 후, 비활성화 시 즉시 제거
@@ -2321,7 +2400,7 @@ async loadResources() {
             parent.tasks.splice(currentIndex, 1);
             this.updateFullPaths();
             this.syncSessionStorage();
-            console.log('[NOTIFICATION] ✅ Resource removed from tree:', resourceName);
+            console.log('[NOTIFICATION] Resource removed from tree:', resourceName);
           }
         }, deleteDelay);
       } else {
@@ -2457,7 +2536,7 @@ async loadResources() {
     // Confirm dialog for loading many CIN resources
     async confirmLoadManyCIN(element) {
       return new Promise((resolve) => {
-        const message = `⚠️ 이 컨테이너에 ${element.childCount}개의 CIN 리소스가 있습니다.\n\n전체를 로드하시겠습니까?\n(취소를 누르면 로드하지 않습니다)`;
+        const message = `이 컨테이너에 ${element.childCount}개의 CIN 리소스가 있습니다.\n\n전체를 로드하시겠습니까?\n(취소를 누르면 로드하지 않습니다)`;
 
         if (confirm(message)) {
           // 전체 로드
@@ -2931,7 +3010,6 @@ async loadResources() {
   background-color: #fff;
   display: flex;
   flex-direction: row;
-  /* justify-content: space-between; */
   align-items: flex-start;
   margin: 0 10px;
   padding: 10px 0;
@@ -2985,21 +3063,64 @@ async loadResources() {
   height: 100%;
   min-width: 1200px;
   overflow: hidden;
+  background: #e8ecf1;
+  border-radius: 12px;
+  padding: 6px;
 }
 
 .canvas {
-  border: 1px solid #d0d0d0;
+  border: none;
   width: 78%;
   height: 80vh;
-  padding: 10px;
-  margin: 10px;
-  background-color: #f3f3f3;
-  border-radius: 15px;
+  padding: 14px;
+  margin: 6px;
+  background: linear-gradient(170deg, #ffffff 0%, #f4f6f9 35%, #eaecf2 70%, #e0e4ec 100%);
+  border-radius: 18px;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.05);
+  position: relative;
+  box-shadow:
+    10px 10px 24px rgba(0, 0, 0, 0.14),
+    -6px -6px 18px rgba(255, 255, 255, 0.9),
+    inset 0 2px 4px rgba(255, 255, 255, 0.8),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.canvas-expand-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(145deg, #e8ecf1, #d1d5db);
+  color: #4a5568;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    3px 3px 6px rgba(0, 0, 0, 0.12),
+    -2px -2px 5px rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}
+
+.canvas-expand-btn:hover {
+  background: linear-gradient(145deg, #dde1e7, #c5c9d0);
+  color: #2d3748;
+  box-shadow:
+    4px 4px 8px rgba(0, 0, 0, 0.16),
+    -2px -2px 6px rgba(255, 255, 255, 0.9);
+}
+
+.canvas-expand-btn:active {
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.12),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.6);
 }
 
 .scroll-container {
@@ -3008,17 +3129,21 @@ async loadResources() {
 }
 
 .rightTab {
-  border: 1px solid #d0d0d0;
+  border: none;
   width: 20%;
   height: 80vh;
-  padding: 10px;
-  margin: 10px;
+  padding: 12px;
+  margin: 6px;
   overflow: auto;
-  background-color: #f3f3f3;
-  border-radius: 15px;
+  background: linear-gradient(170deg, #ffffff 0%, #f4f6f9 35%, #eaecf2 70%, #e0e4ec 100%);
+  border-radius: 18px;
   box-sizing: border-box;
   position: relative;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.05);
+  box-shadow:
+    10px 10px 24px rgba(0, 0, 0, 0.14),
+    -6px -6px 18px rgba(255, 255, 255, 0.9),
+    inset 0 2px 4px rgba(255, 255, 255, 0.8),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.03);
 }
 
 .nav {
@@ -3032,7 +3157,7 @@ async loadResources() {
 
 
 .dragArea {
-  border: 1.1px solid #4374D9;
+  border: none;
   height: 100%;
   overflow-y: auto;
   transform-origin : center center;
@@ -3040,14 +3165,64 @@ async loadResources() {
 }
 
 
+.palette-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5a6a7e;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-align: center;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
 .right_dragArea{
-  border: 1.1px solid #4374D9;
-  height: 40%;
+  border: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
+  background: linear-gradient(160deg, #eef1f6, #e2e6ed);
+  border-radius: 10px;
+  box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.08), inset -2px -2px 6px rgba(255, 255, 255, 0.7);
+  padding: 8px 4px;
+}
+.right_dragArea > .dragArea {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
+  flex-basis: 100%;
+}
+.right_dragArea .resourceBox {
+  width: 50%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+}
+
+.resource-section-label {
+  width: 100%;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8494a7;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 2px 10px;
+  margin-top: 2px;
+}
+
+.resource-section-label.has-divider {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(100, 116, 139, 0.25);
 }
 
 .t_dragArea {
-  border: 1.1px solid #4374D9;
+  border: none;
   height: 100%;
+  background: linear-gradient(160deg, #eef1f6, #e2e6ed);
+  border-radius: 10px;
+  box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.08), inset -2px -2px 6px rgba(255, 255, 255, 0.7);
 }
 
 .resourceTree {
@@ -3056,6 +3231,7 @@ async loadResources() {
 
 .trashcan {
   height: 10%;
+  margin-top: 20px;
   margin-bottom: 20px;
 }
 
@@ -3064,8 +3240,9 @@ async loadResources() {
 }
 .trashcan-image{
   position: relative;
-  left: 44%;
-  bottom: 80%;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 75%;
   width: 40px;
   height: 40px;
 }
@@ -3164,6 +3341,44 @@ async loadResources() {
   width: 120px;
 }
 
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.action-btn {
+  border: 1px solid #d0d0d0;
+  background: linear-gradient(145deg, #ffffff, #e8ecf1);
+  color: #2c3e50;
+  padding: 10px 14px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow:
+    4px 4px 10px rgba(0, 0, 0, 0.12),
+    -3px -3px 8px rgba(255, 255, 255, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}
+.action-btn:hover {
+  background: linear-gradient(145deg, #f0f4ff, #dce3f0);
+  border-color: #4374D9;
+  color: #1a3a6f;
+  box-shadow:
+    5px 5px 12px rgba(0, 0, 0, 0.15),
+    -3px -3px 10px rgba(255, 255, 255, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transform: translateY(-1px);
+}
+.action-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 3px 3px 6px rgba(0, 0, 0, 0.12),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.6);
+}
+
 .deleteZone {
   position: relative;
   height: 10%;
@@ -3192,76 +3407,96 @@ async loadResources() {
   display: none;
 }
 
-/* 확대 뷰 모달 스타일 */
-.zoom-view-overlay {
+/* 캔버스 전체보기 모달 */
+.fullview-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(6px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  animation: fullview-fade-in 0.25s ease;
 }
 
-.zoom-view-container {
-  width: 90%;
+@keyframes fullview-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.fullview-modal {
+  width: 92%;
   height: 90%;
-  background: #f5f5f5;
-  border-radius: 15px;
-  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(170deg, #ffffff 0%, #f4f6f9 35%, #eaecf2 70%, #e0e4ec 100%);
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 2px solid #4374D9;
+  position: relative;
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+  animation: fullview-scale-in 0.25s ease;
 }
 
-.zoom-view-header {
-  padding: 20px 30px;
-  background: linear-gradient(145deg, #4374D9, #2a5bb8);
-  border-bottom: 2px solid #1a4a8a;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+@keyframes fullview-scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
 }
 
-.zoom-view-header h2 {
-  margin: 0;
-  color: white;
-  font-size: 24px;
-  font-weight: 600;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.close-btn {
-  background: white;
-  border: 2px solid #ff4444;
-  color: #ff4444;
-  font-size: 24px;
-  width: 40px;
-  height: 40px;
+.fullview-close {
+  position: absolute;
+  top: 12px;
+  right: 22px;
+  z-index: 10;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
+  border: none;
+  background: linear-gradient(145deg, #e8ecf1, #d1d5db);
+  color: #64748b;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s;
-  font-weight: bold;
+  box-shadow:
+    3px 3px 6px rgba(0, 0, 0, 0.1),
+    -2px -2px 5px rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
 }
 
-.close-btn:hover {
-  background: #ff4444;
-  color: white;
-  transform: scale(1.1);
+.fullview-close:hover {
+  background: linear-gradient(145deg, #fecaca, #fca5a5);
+  color: #dc2626;
+  box-shadow:
+    3px 3px 8px rgba(220, 38, 38, 0.15),
+    -2px -2px 5px rgba(255, 255, 255, 0.9);
 }
 
-.zoom-view-content {
+.fullview-tag {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  z-index: 10;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  background: linear-gradient(145deg, #e8ecf1, #d1d5db);
+  padding: 4px 14px;
+  border-radius: 20px;
+  box-shadow:
+    2px 2px 5px rgba(0, 0, 0, 0.08),
+    -1px -1px 3px rgba(255, 255, 255, 0.7);
+}
+
+.fullview-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
-  background: white;
+  padding: 20px 28px;
 }
 
 .zoom-tree {
@@ -3324,15 +3559,26 @@ async loadResources() {
 }
 
 .settings-gear {
-  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
   user-select: none;
-  line-height: 1;
+  padding: 0;
 }
 
 .settings-gear:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
   transform: rotate(45deg);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
 }
 
 .settings-panel {
@@ -3340,23 +3586,24 @@ async loadResources() {
   top: 100%;
   right: 0;
   margin-top: 8px;
-  background: linear-gradient(145deg, #1e3a5f, #152238);
-  border: 1px solid #0d1829;
+  background: #d8dce4;
+  border: 1px solid #c5cad3;
   border-radius: 12px;
   padding: 14px 18px;
   min-width: 580px;
   z-index: 9999;
-  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.4), -4px -4px 12px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .settings-panel-title {
-  color: #aaa;
-  font-size: 11px;
+  color: #3a4555;
+  font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.2px;
   margin-bottom: 10px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #c5cad3;
 }
 
 .settings-row {
@@ -3371,15 +3618,15 @@ async loadResources() {
 }
 
 .settings-label {
-  color: white;
+  color: #3a4555;
   font-size: 14px;
   font-weight: 500;
 }
 
 .settings-select {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #eaedf2;
+  color: #2e3847;
+  border: 1px solid #b8bec8;
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 13px;
@@ -3387,26 +3634,27 @@ async loadResources() {
 }
 
 .settings-select option {
-  background: #1e3a5f;
-  color: white;
+  background: #eaedf2;
+  color: #2e3847;
 }
 
 .settings-divider {
-  color: #aaa;
+  color: #5a6a7e;
   font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 12px 0 10px;
   padding: 6px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid #c5cad3;
+  border-bottom: 1px solid #c5cad3;
   text-align: center;
 }
 
 .settings-input {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #eaedf2;
+  color: #2e3847;
+  border: 1px solid #b8bec8;
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 13px;
@@ -3415,11 +3663,12 @@ async loadResources() {
 }
 
 .settings-input:focus {
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: #8a9bb0;
+  box-shadow: 0 0 4px rgba(90, 120, 160, 0.25);
 }
 
 .settings-hint {
-  color: #888;
+  color: #7a8594;
   font-size: 10px;
   margin: -6px 0 8px;
 }
@@ -3437,19 +3686,19 @@ async loadResources() {
 }
 
 .header-table thead th {
-  color: #aaa;
+  color: #5a6a7e;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 4px 3px;
   text-align: left;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid #c5cad3;
   white-space: nowrap;
 }
 
 .header-table tbody tr {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid #ccd1d9;
 }
 
 .header-table tbody tr:last-child {
@@ -3457,7 +3706,7 @@ async loadResources() {
 }
 
 .header-td-name {
-  color: white;
+  color: #3a4555;
   font-weight: 500;
   font-size: 12px;
   padding: 3px 4px 3px 0;
@@ -3465,9 +3714,9 @@ async loadResources() {
 }
 
 .header-input {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #eaedf2;
+  color: #2e3847;
+  border: 1px solid #b8bec8;
   border-radius: 4px;
   padding: 3px 5px;
   font-size: 11px;
@@ -3477,7 +3726,8 @@ async loadResources() {
 }
 
 .header-input:focus {
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: #8a9bb0;
+  box-shadow: 0 0 4px rgba(90, 120, 160, 0.25);
 }
 
 .header-input-origin { min-width: 60px; }
@@ -3485,9 +3735,9 @@ async loadResources() {
 .header-input-accept { min-width: 100px; }
 
 .header-select {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #eaedf2;
+  color: #2e3847;
+  border: 1px solid #b8bec8;
   border-radius: 4px;
   padding: 3px 2px;
   font-size: 11px;
@@ -3496,8 +3746,8 @@ async loadResources() {
 }
 
 .header-select option {
-  background: #1e3a5f;
-  color: white;
+  background: #eaedf2;
+  color: #2e3847;
 }
 
 /* 큰 토글 스위치 스타일 */

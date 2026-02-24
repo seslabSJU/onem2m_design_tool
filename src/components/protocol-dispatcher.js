@@ -182,7 +182,7 @@ async function mqtt_delete(originator, host, _port, resourcePath) {
 
   let toPath = (resourcePath || '').replace(/\/+/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
 
-  console.log(`[MQTT DELETE] to=${toPath}`);
+  console.log(`[DELETE:MQTT] to=${toPath}`);
 
   try {
     const result = await mqttRequest(host, wsPort, {
@@ -191,10 +191,10 @@ async function mqtt_delete(originator, host, _port, resourcePath) {
       fr: origin,
       rvi: '2a'
     });
-    console.log(`[MQTT DELETE] Success:`, result);
+    console.log(`[DELETE:MQTT] Success:`, result);
     return result;
   } catch (error) {
-    console.error(`[MQTT DELETE] Failed:`, error);
+    console.error(`[DELETE:MQTT] Failed:`, error);
     throw error;
   }
 }
