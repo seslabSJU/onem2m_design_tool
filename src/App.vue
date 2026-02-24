@@ -29,6 +29,20 @@
             </label>
           </div>
 
+          <!-- Protocol 섹션 -->
+          <div class="settings-divider">Protocol</div>
+          <div class="settings-row">
+            <span class="settings-label">Mode</span>
+            <select v-model="protocolMode" @change="onProtocolChange" class="settings-select">
+              <option value="http">HTTP</option>
+              <option value="mqtt">MQTT</option>
+            </select>
+          </div>
+          <div class="settings-row" v-if="protocolMode === 'mqtt'">
+            <span class="settings-label">MQTT WS Port</span>
+            <input type="text" v-model="mqttWsPort" @input="onProtocolChange" class="header-input" style="width: 80px;" />
+          </div>
+
           <!-- HTTP Headers 섹션 (리소스별) -->
           <div class="settings-divider">HTTP Headers</div>
 
@@ -203,7 +217,6 @@
           Importing TextFile
         </div>
         <br /> <br />
-        <mq_re :cse1="cse1"></mq_re>
       </div>
     </div>
 
@@ -293,11 +306,7 @@ import setAttrs from "@/components/setAttrs.vue";
 import navBar from "@/components/navBar.vue";
 import { resourceType as RT, resourceAttributes } from "./components/attributes";
 import get_jsonfile from "@/components/json-parser.js";
-import mq_re from "@/components/mq-re.vue";
-import http_cse_retrieve from "@/components/retrieve_cse.js"
-import http_resource_retrieve from "@/components/retrieve_r.s.js";
-import loadResourceDetails from "@/components/retrieve_r.s.js";
-import http_resource_delete from "@/components/http-delete.js";
+import { create_resource, retrieve_resource, delete_resource, cse_retrieve } from "@/components/protocol-dispatcher.js";
 import mqtt from 'mqtt';
 
 
@@ -310,7 +319,6 @@ export default {
     draggable,
     nestedDraggable,
     setAttrs,
-    mq_re,
     // rawDisplayer
   },
 
@@ -358,6 +366,8 @@ export default {
       flashingEffectEnabled: true,  // 번쩍이는 효과 토글 (기본값: 켜짐)
       csePreset: 'none',           // CSE 프리셋 ('none' | 'tinyiot')
       showSettings: false,         // 설정 패널 표시 여부
+      protocolMode: 'http',        // 'http' | 'mqtt'
+      mqttWsPort: '9001',          // MQTT WebSocket 포트
       // 리소스 타입별 HTTP 헤더 (명세서 기준 기본값)
       resourceHeaders: {
         1:  { origin: 'CAdmin', rvi: '3',  ri: 'create_acp',  accept: 'application/json' },
@@ -427,6 +437,9 @@ export default {
     }
     // 항상 최신 기본값을 localStorage에 저장 (http-request.js에서 읽을 수 있도록)
     localStorage.setItem('resourceHeaders', JSON.stringify(this.resourceHeaders));
+    // Protocol 설정 복원
+    this.protocolMode = localStorage.getItem('protocolMode') || 'http';
+    this.mqttWsPort = localStorage.getItem('mqttWsPort') || '9001';
     // originator는 setAttrs.vue에서 localStorage에 저장됨 — 복원하여 동기화
     const savedOriginator = localStorage.getItem('originator');
     if (savedOriginator) this.originator = savedOriginator;
@@ -456,6 +469,11 @@ export default {
 
     onHeaderChange() {
       localStorage.setItem('resourceHeaders', JSON.stringify(this.resourceHeaders));
+    },
+
+    onProtocolChange() {
+      localStorage.setItem('protocolMode', this.protocolMode);
+      localStorage.setItem('mqttWsPort', this.mqttWsPort);
     },
 
     saveResourceTree(){ // 리소스트리 텍스트파일로 저장할때 실행되는 곳
@@ -518,7 +536,7 @@ export default {
       if (node.ty === 3 && node.fullPath && !node.instancesLoaded) {
         try {
           const path = node.fullPath;
-          const disc = await http_resource_retrieve(
+          const disc = await retrieve_resource(
             this.originator, target.host, target.port, path, `fu=1&ty=4&lim=${limit}`
           );
           let uris = disc['m2m:uril'] || [];
@@ -529,7 +547,7 @@ export default {
           for (const uri of uris) {
             const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
             try {
-              const cinData = await http_resource_retrieve(
+              const cinData = await retrieve_resource(
                 this.originator, target.host, target.port, cleanUri, ''
               );
               if (cinData['m2m:cin']) {
@@ -551,7 +569,7 @@ export default {
       if (node.ty === 28 && node.fullPath && !node.instancesLoaded) {
         try {
           const path = node.fullPath;
-          const disc = await http_resource_retrieve(
+          const disc = await retrieve_resource(
             this.originator, target.host, target.port, path, `fu=1&ty=58&lim=${limit}`
           );
           let uris = disc['m2m:uril'] || [];
@@ -565,7 +583,7 @@ export default {
           for (const uri of uris) {
             const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
             try {
-              const fcinData = await http_resource_retrieve(
+              const fcinData = await retrieve_resource(
                 this.originator, target.host, target.port, cleanUri, ''
               );
               // m2m:fcin 또는 다른 키(cod: 등)로 올 수 있으므로 유연하게 처리
@@ -733,7 +751,7 @@ async loadResources() {
 
       // 1. 단일 rcn=4 요청으로 전체 트리 가져오기
       console.log("[loadResources] Retrieving full tree with rcn=4...");
-      const data = await http_resource_retrieve(this.originator, target.host, target.port, target.basePath, 'rcn=4&lim=10000');
+      const data = await retrieve_resource(this.originator, target.host, target.port, target.basePath, 'rcn=4&lim=10000');
 
       // 2. CIN/FCIN 최신 1개만 남기기 (메인 트리 미리보기용)
       this.trimInstances(data);
@@ -1087,7 +1105,7 @@ async loadResources() {
           console.log("--->", data['m2m:cb']);
           this.cse1[0].attrs = data['m2m:cb'];
         };
-        http_cse_retrieve(this.originator, ip, port, path, setCSEData);
+        cse_retrieve(this.originator, ip, port, path, setCSEData);
         // console.log(cb);
       }
       else if(protocol === "https"){
@@ -1663,7 +1681,7 @@ async loadResources() {
 
       try {
         console.log('[DELETE] 🚀 Sending DELETE request to:', finalPath);
-        await http_resource_delete(
+        await delete_resource(
           this.originator,
           target.protocol,
           target.host,
@@ -2485,7 +2503,7 @@ async loadResources() {
 
           // 1. CIN 로드 (ty=4, 최신 5개만)
           try {
-            const cinUriList = await http_resource_retrieve(
+            const cinUriList = await retrieve_resource(
               this.originator,
               target.host,
               target.port,
@@ -2501,7 +2519,7 @@ async loadResources() {
 
           // 2. SUB 로드 (ty=23, 전체)
           try {
-            const subUriList = await http_resource_retrieve(
+            const subUriList = await retrieve_resource(
               this.originator,
               target.host,
               target.port,
@@ -2518,7 +2536,7 @@ async loadResources() {
           // CNT가 아닌 경우 기존 로직
           console.log(`[LOAD CHILDREN] Discovering direct children...`);
 
-          const uriList = await http_resource_retrieve(
+          const uriList = await retrieve_resource(
             this.originator,
             target.host,
             target.port,
@@ -2554,7 +2572,7 @@ async loadResources() {
         for (const uri of childUris) {
           try {
             console.log(`[LOAD CHILDREN] Loading: ${uri}`);
-            const resData = await http_resource_retrieve(
+            const resData = await retrieve_resource(
               this.originator,
               target.host,
               target.port,
