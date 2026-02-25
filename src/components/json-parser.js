@@ -107,6 +107,13 @@ export async function make_request_resource(currentNode, path, targetIP, origina
     });
   }
 
+  // 빈 값('', null, undefined)은 요청에서 제외 — 서버 기본값 사용
+  Object.keys(resource).forEach(key => {
+    if (resource[key] === '' || resource[key] === null || resource[key] === undefined) {
+      delete resource[key];
+    }
+  });
+
   try {
     const response = await create_resource(resource, path, targetIP);
 
@@ -165,6 +172,13 @@ export async function make_update_request(currentNode, path, targetIP)
       }
     });
   }
+
+  // 빈 값('', null, undefined)은 요청에서 제외 — 서버 기본값 사용
+  Object.keys(resource).forEach(key => {
+    if (resource[key] === '' || resource[key] === null || resource[key] === undefined) {
+      delete resource[key];
+    }
+  });
 
   // cnd는 body key 생성에 필요하므로 별도 보관 후 제거
   const cnd = resource['cnd'];

@@ -392,37 +392,40 @@ export const resourceAttributes = {
             value: false
         },
         'mni': {
-            type: "Number", 
+            type: "Number",
             fullName: "Max Nr of Instances",
             description: "The maximum number of instances of the resource",
-            required:false, 
-            disable: false, 
-            value: 0,
-            validation: function (value) { 
+            required:false,
+            disable: false,
+            value: '',
+            validation: function (value) {
+                if(value === '' || value === null) return true;
                 if(value < 0) return false;
                 return true;
             }
         },
         'mbs': {
-            type: "Number", 
+            type: "Number",
             fullName: "Max Byte Size",
             description: "The maximum byte size of the resource",
-            required:false, 
-            disable: false, 
-            value: 0,
-            validation: function (value) { 
+            required:false,
+            disable: false,
+            value: '',
+            validation: function (value) {
+                if(value === '' || value === null) return true;
                 if(value < 0) return false;
                 return true;
             }
         },
         'mia': {
-            type: "Number", 
+            type: "Number",
             fullName: "Max Instance Age",
             description: "The maximum instance age of the resource",
-            required:false, 
-            disable: false, 
-            value: 0,
-            validation: function (value) { 
+            required:false,
+            disable: false,
+            value: '',
+            validation: function (value) {
+                if(value === '' || value === null) return true;
                 if(value < 0) return false;
                 return true;
             }

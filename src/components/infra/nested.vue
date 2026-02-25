@@ -40,7 +40,7 @@
           >
             {{ element.expanded ? '−' : '+' }}
           </button>
-          <span v-if="(element.ty === 3 || element.ty === 28) && element.childCount" class="child-count">
+          <span v-if="(element.ty === 3 || element.ty === 28 || element.ty === 29) && element.childCount" class="child-count">
             {{ element.childCount }}
           </span>
 

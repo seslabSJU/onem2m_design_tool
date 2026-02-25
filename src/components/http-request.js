@@ -149,7 +149,7 @@ async function create_resource(attr, path, targetIP)
         console.log(error);
 
         // alert(`Failed to create resource of type ${now_type}.\nError: ${error.message}`);
-        alert(`Error: ${error.response.data['m2m:dbg'] || error.response.statusText}`);
+        alert(`Error: ${error?.response?.data?.['m2m:dbg'] || error?.response?.statusText || error.message}`);
         
         //console.log(url);
         throw error;
