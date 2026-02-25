@@ -745,7 +745,7 @@ export const resourceAttributes = {
             description: "The maximum number of instances of the resource",
             required: false,
             disable: false,
-            value: 0,
+            value: 1000,
             validation: function (value) {
                 if (value < 0) return false;
                 return true;
@@ -757,7 +757,7 @@ export const resourceAttributes = {
             description: "The maximum byte size of the resource",
             required: false,
             disable: false,
-            value: 0,
+            value: 65536,
             validation: function (value) {
                 if (value < 0) return false;
                 return true;
@@ -769,7 +769,7 @@ export const resourceAttributes = {
             description: "The maximum instance age of the resource",
             required: false,
             disable: false,
-            value: 0,
+            value: 157680000,
             validation: function (value) {
                 if (value < 0) return false;
                 return true;
@@ -1118,7 +1118,7 @@ export const tinyIoTPresets = {
   28: { // FCNT
     rn: 'myFCNT',
     cnd: 'org.onem2m.common.moduleclass.temperature',
-    fcied: true, mni: 10, mbs: 16384, mia: 86400,
+    fcied: true, mni: 1000, mbs: 65536, mia: 157680000,
     curT0: 25.5
   },
   58: { // FCIN — 자동 생성이라 프리셋 없음

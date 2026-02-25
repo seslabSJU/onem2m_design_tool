@@ -324,7 +324,7 @@ export default {
       }
 
       if (element.ty === RT_FCIN) {
-        const skipKeys = ['rn', 'lbl', 'ty', 'cs', 'ri', 'ct', 'lt', 'pi', 'et', 'st', 'cni', 'cbs', 'cnd', 'org', 'cnf'];
+        const skipKeys = ['rn', 'lbl', 'ty', 'cs', 'ri', 'ct', 'lt', 'pi', 'et', 'st', 'cni', 'cbs', 'cnd', 'org', 'cnf', 'custom_attrs'];
         const customPairs = Object.entries(attrs)
           .filter(([key]) => !skipKeys.includes(key))
           .map(([key, val]) => `${key}: ${val}`);

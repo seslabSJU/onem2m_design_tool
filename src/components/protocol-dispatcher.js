@@ -6,6 +6,7 @@ import http_create_resource from './http-request.js';
 import http_cse_retrieve_fn from './retrieve_cse.js';
 import http_resource_retrieve_fn from './retrieve_r.s.js';
 import http_resource_delete_fn from './http-delete.js';
+import http_update_resource_fn from './http-update.js';
 import { request as mqttRequest } from './mqtt-client.js';
 
 function getProtocolMode() {
@@ -102,6 +103,91 @@ async function mqtt_create_resource(attr, path, targetIP) {
     return result;
   } catch (error) {
     console.error(`[MQTT CREATE] Failed:`, error);
+    const msg = error?.data?.['m2m:dbg'] || error?.message || 'Unknown error';
+    alert(`Error (MQTT): ${msg}`);
+    throw error;
+  }
+}
+
+// ═══ UPDATE ═══
+async function update_resource(attr, path, targetIP) {
+  if (getProtocolMode() === 'mqtt') {
+    return mqtt_update_resource(attr, path, targetIP);
+  }
+  return http_update_resource_fn(attr, path, targetIP);
+}
+
+async function mqtt_update_resource(attr, path, targetIP) {
+  const host = extractHost(targetIP);
+  const wsPort = getMqttWsPort();
+
+  const typeMap = { 1: 'acp', 2: 'ae', 3: 'cnt', 4: 'cin', 9: 'grp', 23: 'sub', 28: 'fcnt', 58: 'fcin', 29: 'ts', 30: 'tsi' };
+  const ty = attr['ty'];
+  const nowType = typeMap[ty] || 'unknown';
+
+  if (nowType === 'unknown') {
+    console.error('[MQTT UPDATE] Unknown resource type:', ty);
+    return;
+  }
+
+  // body 구성 (헤더 속성 제외)
+  const headerAttrs = ['ty', 'rvi'];
+  const bodyAttrs = {};
+  for (const key in attr) {
+    if (attr.hasOwnProperty(key) && !headerAttrs.includes(key)) {
+      bodyAttrs[key] = attr[key];
+    }
+  }
+
+  // SUB: net -> enc.net
+  if (nowType === 'sub' && bodyAttrs['net']) {
+    bodyAttrs['enc'] = { 'net': bodyAttrs['net'] };
+    delete bodyAttrs['net'];
+  }
+
+  // FCNT: _cnd 또는 cnd 기반 body 키
+  let bodyKey;
+  const cndValue = bodyAttrs['_cnd'] || bodyAttrs['cnd'];
+  if (nowType === 'fcnt' && cndValue) {
+    const cndParts = cndValue.split('.');
+    const shortName = cndParts[cndParts.length - 1];
+    const abbr = shortName.length > 5 ? shortName.substring(0, 5) : shortName;
+    bodyKey = `cod:${abbr}`;
+  } else {
+    bodyKey = `m2m:${nowType}`;
+  }
+  // cnd, _cnd는 body key 생성용이므로 body에서 제거
+  delete bodyAttrs['cnd'];
+  delete bodyAttrs['_cnd'];
+
+  const pc = { [bodyKey]: bodyAttrs };
+
+  // localStorage에서 리소스별 헤더 설정값 읽기
+  let resHeaders = {};
+  try { resHeaders = JSON.parse(localStorage.getItem('resourceHeaders') || '{}'); } catch (e) {}
+  const h = resHeaders[ty] || {};
+  const origin = h.origin || localStorage.getItem('originator') || 'CAdmin';
+  const rvi = h.rvi || '2a';
+
+  // UPDATE는 리소스 자체 경로 사용 (마지막 세그먼트 제거 안 함)
+  let toPath = path;
+  if (toPath.startsWith('/')) toPath = toPath.substring(1);
+
+  console.log(`[MQTT UPDATE] to=${toPath}, ty=${ty}, bodyKey=${bodyKey}`);
+
+  try {
+    const result = await mqttRequest(host, wsPort, {
+      op: 3,
+      to: toPath,
+      fr: origin,
+      pc: pc,
+      rvi: rvi
+    });
+    console.log(`[MQTT UPDATE] Success:`, result);
+    alert(`Resource of type ${nowType} updated successfully! (MQTT)`);
+    return result;
+  } catch (error) {
+    console.error(`[MQTT UPDATE] Failed:`, error);
     const msg = error?.data?.['m2m:dbg'] || error?.message || 'Unknown error';
     alert(`Error (MQTT): ${msg}`);
     throw error;
@@ -233,4 +319,4 @@ async function mqtt_cse_retrieve(originator, host, _port, path) {
   return result;
 }
 
-export { create_resource, retrieve_resource, delete_resource, cse_retrieve };
+export { create_resource, update_resource, retrieve_resource, delete_resource, cse_retrieve };

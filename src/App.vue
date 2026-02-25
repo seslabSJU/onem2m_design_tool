@@ -284,6 +284,10 @@
               this.selectedElement.attrs[key] = val;
             }
           });
+          // 속성이 변경되었으므로 modified 플래그 설정 (UPDATE 대상 표시)
+          if (this.selectedElement.createdOnServer) {
+            this.selectedElement.modified = true;
+          }
           callback();
       }"
         @update-rn="handleUpdateRn"
@@ -665,6 +669,8 @@ export default {
           if (!Array.isArray(uris)) {
             uris = [uris];
           }
+          // 최신 FCIN이 먼저 오도록 역순 정렬
+          uris.reverse();
 
           for (const uri of uris) {
             const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
@@ -780,7 +786,7 @@ export default {
     },
 
     // createResourceTree랑 짝꿍
-    async create_oneM2M_resource() { 
+    async create_oneM2M_resource() {
       const JSON_string = JSON.stringify(this.cse1);
       const dataToSave = JSON.parse(JSON_string);
       const target_IP = this.targetIP;
@@ -788,6 +794,90 @@ export default {
       try {
       // get_jsonfile 함수를 비동기로 호출하고 결과를 기다림
       const response = await get_jsonfile(dataToSave, target_IP);
+
+      // CREATE 성공 후: 원본 트리에 createdOnServer 플래그 반영
+      const markCreated = (node) => {
+        if (node && typeof node === 'object') {
+          if (!node.createdOnServer && node.ty !== 5) {
+            node.createdOnServer = true;
+          }
+          if (Array.isArray(node.tasks)) node.tasks.forEach(markCreated);
+        }
+      };
+      if (this.cse1) this.cse1.forEach(markCreated);
+
+      // UPDATE 성공 후: modified FCNT의 FCIN 새로고침 + modified 플래그 해제
+      const modifiedFcnts = [];
+      const collectAndClear = (node) => {
+        if (node && typeof node === 'object') {
+          if (node.modified && node.ty === 28) modifiedFcnts.push(node);
+          if (node.modified) node.modified = false;
+          if (Array.isArray(node.tasks)) node.tasks.forEach(collectAndClear);
+        }
+      };
+      if (this.cse1) this.cse1.forEach(collectAndClear);
+
+      // modified FCNT의 FCIN(최신 1개)을 다시 로드
+      if (modifiedFcnts.length > 0) {
+        const target = this.parseTargetUrl(this.targetIP);
+        if (target) {
+          for (const fcntNode of modifiedFcnts) {
+            try {
+              const path = fcntNode.fullPath;
+              if (!path) {
+                console.warn('[UPDATE] No fullPath for FCNT:', fcntNode.attrs?.rn);
+                continue;
+              }
+              // 기존 FCIN 제거
+              fcntNode.tasks = fcntNode.tasks.filter(t => t.ty !== 58);
+              // 최신 FCIN 로드 — /la (latest) 가상 리소스 사용
+              const laPath = path + '/la';
+              console.log('[UPDATE] Retrieving latest FCIN:', laPath);
+              const fcinData = await retrieve_resource(
+                this.originator, target.host, target.port, laPath, ''
+              );
+              let fcinNode = fcinData['m2m:fcin'];
+              if (!fcinNode) {
+                for (const key of Object.keys(fcinData)) {
+                  if (typeof fcinData[key] === 'object' && fcinData[key] !== null && fcinData[key].ty === 58) {
+                    fcinNode = fcinData[key]; break;
+                  }
+                }
+              }
+              if (fcinNode) {
+                fcntNode.tasks.push(this.convertNode(fcinNode, 'FCIN', 0, false));
+                console.log('[UPDATE] Reloaded latest FCIN for', fcntNode.attrs?.rn);
+              } else {
+                console.warn('[UPDATE] No FCIN found in /la response for', fcntNode.attrs?.rn);
+              }
+              // FCNT 자체를 다시 조회하여 cni(childCount) 갱신
+              try {
+                const fcntData = await retrieve_resource(
+                  this.originator, target.host, target.port, path, ''
+                );
+                let fcntServer = fcntData['m2m:fcnt'];
+                if (!fcntServer) {
+                  for (const key of Object.keys(fcntData)) {
+                    if (typeof fcntData[key] === 'object' && fcntData[key] !== null && fcntData[key].ty === 28) {
+                      fcntServer = fcntData[key]; break;
+                    }
+                  }
+                }
+                if (fcntServer && fcntServer.cni !== undefined) {
+                  fcntNode.childCount = fcntServer.cni;
+                  console.log('[UPDATE] Updated cni for', fcntNode.attrs?.rn, '→', fcntServer.cni);
+                }
+              } catch (cniErr) {
+                console.warn('[UPDATE] Failed to refresh cni for', fcntNode.attrs?.rn, cniErr);
+              }
+            } catch (err) {
+              console.warn('[UPDATE] Failed to reload FCIN for', fcntNode.attrs?.rn, err);
+            }
+          }
+          this.syncSessionStorage();
+        }
+      }
+
       // 성공적으로 작업을 완료했다면 성공 로그를 출력하고, 성공적인 결과를 나타내는 값을 반환
       console.log("Resource creation successful", response);
       // 추가적으로, 성공 메시지를 alert 또는 다른 UI 요소를 통해 사용자에게 알릴 수 있음
@@ -996,18 +1086,19 @@ async loadResources() {
         // FCNT/FCIN의 경우 SDT 커스텀 속성 보존 (스키마에 없는 나머지 속성 전부 복사)
         if (node.ty === 28 || node.ty === 58) {
             const skipKeys = ['ri', 'ct', 'lt', 'pi', 'et', 'st', 'ty', 'cni', 'cbs'];
-            Object.keys(node).forEach((key) => {
-                if (!key.startsWith('m2m:') && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
-                    // custom_attrs가 객체면 펼쳐서 개별 속성으로 저장
-                    if (key === 'custom_attrs' && typeof node[key] === 'object' && node[key] !== null && !Array.isArray(node[key])) {
-                        Object.entries(node[key]).forEach(([cKey, cVal]) => {
-                            if (baseAttrs[cKey] === undefined) {
-                                baseAttrs[cKey] = cVal;
-                            }
-                        });
-                    } else {
-                        baseAttrs[key] = node[key];
+            // custom_attrs 객체가 있으면 먼저 펼쳐서 개별 속성으로 저장
+            if (node['custom_attrs'] && typeof node['custom_attrs'] === 'object' && !Array.isArray(node['custom_attrs'])) {
+                Object.entries(node['custom_attrs']).forEach(([cKey, cVal]) => {
+                    if (baseAttrs[cKey] === undefined) {
+                        baseAttrs[cKey] = cVal;
                     }
+                });
+            }
+            Object.keys(node).forEach((key) => {
+                // custom_attrs는 이미 펼쳤으므로 skip, cod: 키는 자식 리소스이므로 skip
+                if (!key.startsWith('m2m:') && !key.startsWith('cod:') && key !== 'custom_attrs'
+                    && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
+                    baseAttrs[key] = node[key];
                 }
             });
         }
@@ -2926,18 +3017,19 @@ async loadResources() {
         // FCNT/FCIN의 경우 SDT 커스텀 속성 보존 (스키마에 없는 나머지 속성 전부 복사)
         if (node.ty === 28 || node.ty === 58) {
             const skipKeys = ['ri', 'ct', 'lt', 'pi', 'et', 'st', 'ty', 'cni', 'cbs'];
-            Object.keys(node).forEach((key) => {
-                if (!key.startsWith('m2m:') && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
-                    // custom_attrs가 객체면 펼쳐서 개별 속성으로 저장
-                    if (key === 'custom_attrs' && typeof node[key] === 'object' && node[key] !== null && !Array.isArray(node[key])) {
-                        Object.entries(node[key]).forEach(([cKey, cVal]) => {
-                            if (baseAttrs[cKey] === undefined) {
-                                baseAttrs[cKey] = cVal;
-                            }
-                        });
-                    } else {
-                        baseAttrs[key] = node[key];
+            // custom_attrs 객체가 있으면 먼저 펼쳐서 개별 속성으로 저장
+            if (node['custom_attrs'] && typeof node['custom_attrs'] === 'object' && !Array.isArray(node['custom_attrs'])) {
+                Object.entries(node['custom_attrs']).forEach(([cKey, cVal]) => {
+                    if (baseAttrs[cKey] === undefined) {
+                        baseAttrs[cKey] = cVal;
                     }
+                });
+            }
+            Object.keys(node).forEach((key) => {
+                // custom_attrs는 이미 펼쳤으므로 skip, cod: 키는 자식 리소스이므로 skip
+                if (!key.startsWith('m2m:') && !key.startsWith('cod:') && key !== 'custom_attrs'
+                    && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
+                    baseAttrs[key] = node[key];
                 }
             });
         }
