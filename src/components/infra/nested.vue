@@ -30,16 +30,6 @@
             {{ getDisplayText(element) }}
           </p>
 
-          <!-- CNT/FCNT/TS 인스턴스 토글 표시 -->
-          <button
-            v-if="(element.ty === 3 || element.ty === 28 || element.ty === 29) && element.createdOnServer && element.hasChildren && (element.childType === 4 || element.childType === 58 || element.childType === 30)"
-            class="toggleBtn"
-            :style="getToggleStyle(element.ty)"
-            @click.stop="$emit('toggle-expand', element, 'default')"
-            :title="element.expanded ? 'Collapse' : 'Expand'"
-          >
-            {{ element.expanded ? '−' : '+' }}
-          </button>
           <span v-if="(element.ty === 3 || element.ty === 28 || element.ty === 29) && element.childCount" class="child-count">
             {{ element.childCount }}
           </span>
@@ -59,14 +49,13 @@
           </button>
         </div>
 
-        <!-- Show children: CNT/FCNT 인스턴스 토글 제어, 나머지는 항상 표시 -->
+        <!-- Show children -->
         <nested-draggable
-          v-if="(((element.ty === 3 && element.childType === 4) || (element.ty === 28 && element.childType === 58) || (element.ty === 29 && element.childType === 30)) ? element.expanded : true) && element.tasks && getChildRT(element.ty).length > 0"
+          v-if="element.tasks && getChildRT(element.ty).length > 0"
           :tasks="element.tasks"
           :group="this.group"
           @clicked="(element) => { $emit('clicked', element) }"
           @drag-start="(evt) => { $emit('drag-start', evt) }"
-          @toggle-expand="(element, side) => { $emit('toggle-expand', element, side) }"
           @zoom-view="(element) => { $emit('zoom-view', element) }"
           @load-all-instances="(element) => { $emit('load-all-instances', element) }"
           :childRT="getChildRT(element.ty)"
@@ -357,99 +346,11 @@ export default {
 
       return element.name || '';
     },
-    getToggleStyle(ResourceType) {
-      let bgColor = '';
-      let shadowColor = '';
-
-      switch (ResourceType) {
-        case RT_CSE:
-          bgColor = 'skyblue';
-          shadowColor = 'rgba(135, 206, 235, 0.5)';
-          break;
-        case RT_AE:
-          bgColor = '#8BC34A';
-          shadowColor = 'rgba(139, 195, 74, 0.5)';
-          break;
-        case RT_CNT:
-          bgColor = '#FF9800';
-          shadowColor = 'rgba(255, 152, 0, 0.5)';
-          break;
-        case RT_CIN:
-          bgColor = '#FFB74D';
-          shadowColor = 'rgba(255, 183, 77, 0.5)';
-          break;
-        case RT_ACP:
-          bgColor = 'red';
-          shadowColor = 'rgba(255, 0, 0, 0.5)';
-          break;
-        case RT_GRP:
-          bgColor = '#9C27B0';
-          shadowColor = 'rgba(156, 39, 176, 0.5)';
-          break;
-        case RT_SUB:
-          bgColor = '#2196F3';
-          shadowColor = 'rgba(33, 150, 243, 0.5)';
-          break;
-        case RT_FCNT:
-          bgColor = '#E53935';
-          shadowColor = 'rgba(229, 57, 53, 0.5)';
-          break;
-        case RT_FCIN:
-          bgColor = '#EF9A9A';
-          shadowColor = 'rgba(239, 154, 154, 0.5)';
-          break;
-        case RT_TS:
-          bgColor = '#3F51B5';
-          shadowColor = 'rgba(63, 81, 181, 0.5)';
-          break;
-        case RT_TSI:
-          bgColor = '#7986CB';
-          shadowColor = 'rgba(121, 134, 203, 0.5)';
-          break;
-        default:
-          bgColor = '#667eea';
-          shadowColor = 'rgba(102, 126, 234, 0.5)';
-      }
-
-      return {
-        background: bgColor,
-        boxShadow: `0 2px 6px ${shadowColor}`
-      };
-    }
   }
 };
 </script>
 
 <style scoped>
-.toggleBtn {
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 28px;
-  height: 28px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-right: 8px;
-  margin-left: 4px;
-  padding: 0;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.toggleBtn:hover {
-  filter: brightness(1.2);
-  transform: scale(1.15);
-}
-
-.toggleBtn:active {
-  transform: scale(0.95);
-  filter: brightness(0.9);
-}
-
 .child-count {
   font-size: 12px;
   color: #666;

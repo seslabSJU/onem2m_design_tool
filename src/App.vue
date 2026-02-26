@@ -152,7 +152,6 @@
           @move="(evt) => { this.isDragging = true; }"
           @add="handleAdd"
           @drag-start="handleDragStart"
-          @toggle-expand="handleToggleExpand"
           @zoom-view="openZoomView"
           :dragoverBubble="true"
           class="dragArea resourceTree"
@@ -335,7 +334,6 @@
           @move="(evt) => { this.isDragging = true; }"
           @add="handleAdd"
           @drag-start="handleDragStart"
-          @toggle-expand="handleToggleExpand"
           @zoom-view="openZoomView"
           :dragoverBubble="true"
           class="dragArea resourceTree zoom-tree"
@@ -368,7 +366,6 @@
           @clicked="(element) => {
             this.setAttributes(element);
           }"
-          @toggle-expand="handleToggleExpand"
           @load-all-instances="loadAllInstances"
           class="dragArea resourceTree zoom-tree"
         ></nestedDraggable>
@@ -454,6 +451,7 @@ export default {
       // MQTT 관련
       mqttClient: null,
       realtimeSyncEnabled: false,
+      isCreatingResources: false,
       subscriptionCreated: false,
       subscriptionResourceName: null,
       flashingResources: new Set(),
@@ -639,14 +637,15 @@ export default {
       return null;
     },
 
-    // 클론에서 CIN/FCIN 노드 제거 (줌뷰 로드 전 정리)
+    // 클론에서 CIN/FCIN/TSI/SUB 노드 제거 (줌뷰 로드 전 정리)
     stripCloneInstances(node) {
       if (node.tasks) {
-        node.tasks = node.tasks.filter(t => t.ty !== 4 && t.ty !== 58 && t.ty !== 30);
+        node.tasks = node.tasks.filter(t => t.ty !== 4 && t.ty !== 58 && t.ty !== 30 && t.ty !== 23);
         node.tasks.forEach(child => this.stripCloneInstances(child));
       }
       if (node.ty === 3 || node.ty === 28 || node.ty === 29) {
         node.instancesLoaded = false;
+        node.subsLoaded = false;
       }
     },
 
@@ -781,6 +780,45 @@ export default {
         }
       }
 
+      // SUB(ty=23) 로드 - 확대뷰에서 전부 표시
+      if ((node.ty === 3 || node.ty === 28 || node.ty === 29) && node.fullPath && !node.subsLoaded) {
+        try {
+          const path = node.fullPath;
+          const disc = await retrieve_resource(
+            this.originator, target.host, target.port, path, 'fu=1&ty=23&lvl=1'
+          );
+          let uris = disc['m2m:uril'] || [];
+          if (typeof uris === 'string') {
+            uris = uris.trim().split(/\s+/).filter(u => u.length > 0);
+          }
+          if (!Array.isArray(uris)) {
+            uris = [uris];
+          }
+
+          const subNodes = [];
+          for (const uri of uris) {
+            const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
+            try {
+              const subData = await retrieve_resource(
+                this.originator, target.host, target.port, cleanUri, ''
+              );
+              if (subData['m2m:sub']) {
+                subNodes.push(this.convertNode(subData['m2m:sub'], 'SUB', 0, false));
+              }
+            } catch (err) {
+              console.warn(`[loadInstances] Failed to load SUB: ${cleanUri}`);
+            }
+          }
+          // ct(생성시간) 내림차순 정렬 — 최신이 맨 위
+          subNodes.sort((a, b) => (b.attrs?.ct || '').localeCompare(a.attrs?.ct || ''));
+          node.tasks.push(...subNodes);
+          node.subsLoaded = true;
+          console.log(`[loadInstances] Loaded ${uris.length} SUBs for ${node.attrs?.rn}`);
+        } catch (error) {
+          console.warn(`[loadInstances] No SUBs for ${node.attrs?.rn}`);
+        }
+      }
+
       // 자식 재귀
       if (node.tasks) {
         for (const child of node.tasks) {
@@ -792,9 +830,10 @@ export default {
     // 전체 인스턴스 로드 (▼ All 버튼)
     async loadAllInstances(element) {
       console.log("[loadAllInstances] Loading all instances for:", element.attrs?.rn);
-      // 기존 CIN/FCIN 제거 후 전체 재로드
-      element.tasks = element.tasks.filter(t => t.ty !== 4 && t.ty !== 58 && t.ty !== 30);
+      // 기존 CIN/FCIN/TSI/SUB 제거 후 전체 재로드
+      element.tasks = element.tasks.filter(t => t.ty !== 4 && t.ty !== 58 && t.ty !== 30 && t.ty !== 23);
       element.instancesLoaded = false;
+      element.subsLoaded = false;
       await this.loadInstancesForTree(element, 1000);
       element.instancesLoadedAll = true;
     },
@@ -834,6 +873,7 @@ export default {
       const dataToSave = JSON.parse(JSON_string);
       const target_IP = this.targetIP;
 
+      this.isCreatingResources = true;
       try {
       // get_jsonfile 함수를 비동기로 호출하고 결과를 기다림
       const response = await get_jsonfile(dataToSave, target_IP);
@@ -932,8 +972,10 @@ export default {
       console.error("Resource creation failed:", error);
       // alert("Failed to create resource. Error: " + error.message);
       return false;
+    } finally {
+      this.isCreatingResources = false;
     }
-  }, 
+  },
 
 
     // saveResourceTree랑 짝꿍
@@ -1879,7 +1921,31 @@ async loadResources() {
       }
 
       try {
+        // 삭제 전 부모 찾기 (childCount 갱신용)
+        const deletedTy = element.ty;
+        const deletedPath = element.fullPath || this.draggedElementPath || '';
+        let deleteParent = null;
+        if (deletedPath && (deletedTy === 4 || deletedTy === 58 || deletedTy === 30)) {
+          const parts = deletedPath.split('/');
+          parts.pop();
+          const parentPath = parts.join('/');
+          const findByPath = (nodes) => {
+            for (const n of nodes) {
+              if (n.fullPath === parentPath) return n;
+              if (n.tasks) { const f = findByPath(n.tasks); if (f) return f; }
+            }
+            return null;
+          };
+          deleteParent = findByPath(this.cse1);
+        }
+
         await this.deleteResourceFromServer(element);
+
+        // 부모 childCount 감소
+        if (deleteParent && deleteParent.childCount > 0) {
+          deleteParent.childCount--;
+        }
+
         const successMsg = hasChildren
           ? `"${resourceName}"과 하위 리소스가 삭제되었습니다.`
           : `"${resourceName}" 리소스가 삭제되었습니다.`;
@@ -2170,6 +2236,8 @@ async loadResources() {
       console.log('[SUBSCRIPTION] Creating or finding subscription on:', targetPath);
 
       const expectedMqttNu = `mqtt://${target.host}:1883/designTool`;
+      const expectedNct = 1;
+      const expectedNet = [1, 2, 3, 4];
 
       // 1. 기존 designToolSub 중 내 호스트에 맞는 것 찾기 (삭제 안 함)
       try {
@@ -2214,15 +2282,39 @@ async loadResources() {
                 const nu = subData?.['m2m:sub']?.nu || [];
 
                 if (nu.includes(expectedMqttNu)) {
-                  // 내 호스트에 맞는 MQTT SUB → 재사용
-                  const parts = subUri.split('/');
-                  const subName = parts[parts.length - 1];
-                  if (!resourcePath) {
-                    this.subscriptionResourceName = subName;
-                    this.subscriptionCreated = true;
+                  const existingSub = subData?.['m2m:sub'];
+                  const existingNct = existingSub?.nct;
+                  const existingNet = existingSub?.enc?.net || [];
+
+                  // 모든 속성이 일치하는지 확인
+                  const nctMatch = existingNct === expectedNct;
+                  const netMatch = JSON.stringify([...existingNet].sort()) === JSON.stringify([...expectedNet].sort());
+
+                  if (nctMatch && netMatch) {
+                    // 속성 일치 → 재사용
+                    const parts = subUri.split('/');
+                    const subName = parts[parts.length - 1];
+                    if (!resourcePath) {
+                      this.subscriptionResourceName = subName;
+                      this.subscriptionCreated = true;
+                    }
+                    console.log('[SUBSCRIPTION] Reusing existing subscription:', subName, 'at', targetPath);
+                    return { success: true, subscriptionName: subName, reused: true };
+                  } else {
+                    // 속성 불일치 → 삭제 후 새로 생성
+                    console.log('[SUBSCRIPTION] Sub config mismatch, deleting:', subUri, { nctMatch, netMatch });
+                    try {
+                      await fetch(`http://${target.host}:${target.port}/${subUri}`, {
+                        method: 'DELETE',
+                        headers: {
+                          'X-M2M-Origin': this.originator,
+                          'X-M2M-RVI': '2a'
+                        }
+                      });
+                    } catch (e) {
+                      console.log('[SUBSCRIPTION] Failed to delete old sub:', e);
+                    }
                   }
-                  console.log('[SUBSCRIPTION] Reusing existing MQTT subscription:', subName, 'at', targetPath);
-                  return { success: true, subscriptionName: subName, reused: true };
                 }
                 // 다른 호스트의 sub은 건드리지 않고 스킵
               }
@@ -2238,15 +2330,13 @@ async loadResources() {
       // 2. 일치하는 게 없으면 새로 생성 (기존 sub 삭제 안 함)
       const subscriptionName = 'designToolSub_' + Date.now();
 
-      // targetIP에서 호스트 추출하여 MQTT nu 생성
-      const mqttNu = `mqtt://${target.host}:1883/designTool`;
-
       const subscriptionData = {
         'm2m:sub': {
           rn: subscriptionName,
-          nu: [mqttNu], // 동적으로 생성된 MQTT broker 주소
+          nu: [expectedMqttNu],
+          nct: expectedNct,
           enc: {
-            net: [1, 2, 3, 4] // UPDATE, DELETE_RESOURCE, CREATE_CHILD, DELETE_CHILD
+            net: expectedNet
           }
         }
       };
@@ -2300,8 +2390,8 @@ async loadResources() {
       const findAllCNTs = (node, parentPath = '') => {
         const cnts = [];
 
-        if (node.ty === 3 || node.ty === 29) {
-          // CNT 또는 TS 타입인 경우
+        if (node.ty === 3 || node.ty === 28 || node.ty === 29) {
+          // CNT, FCNT 또는 TS 타입인 경우
           const fullPath = parentPath ? `${parentPath}/${node.attrs.rn}` : node.attrs.rn;
           cnts.push({ name: node.attrs.rn, path: fullPath });
         }
@@ -2374,13 +2464,31 @@ async loadResources() {
       const rep = nev.rep || {};
       const sur = sgn.sur || '';
 
-      // TinyIoT bug workaround: DELETE event with resource data is actually CREATE
+      // TinyIoT workaround: net=3(Create Child)/4(Delete Child) 구분 처리
+      const originalNet = net;
       if ((net === 3 || net === 4) && rep) {
-        // Check if rep has resource data
         const resourceKey = Object.keys(rep).find(key => key.startsWith('m2m:'));
         if (resourceKey) {
-          console.log('[TRANSFORM] TinyIoT bug detected: DELETE(' + net + ') -> CREATE(1)');
-          net = 1; // CREATE_OF_DIRECT_CHILD_RESOURCE
+          const repRn = rep[resourceKey].rn || '';
+          const surParts = sur.split('/');
+          if (surParts.length > 0 && surParts[surParts.length - 1].startsWith('designToolSub')) {
+            surParts.pop();
+          }
+          const parentRn = surParts[surParts.length - 1] || '';
+
+          if (repRn === parentRn) {
+            // rep의 rn이 부모와 같음 → 자기 자신의 UPDATE
+            console.log('[TRANSFORM] TinyIoT: net=' + originalNet + ' self rn → UPDATE(2)');
+            net = 2;
+          } else if (originalNet === 3) {
+            // net=3 + 자식 rn → 자식 CREATE
+            console.log('[TRANSFORM] TinyIoT: net=3 child rn → CREATE(1)');
+            net = 1;
+          } else {
+            // net=4 + 자식 rn → 자식 DELETE
+            console.log('[TRANSFORM] TinyIoT: net=4 child rn → DELETE(3)');
+            net = 3;
+          }
         }
       }
 
@@ -2398,14 +2506,17 @@ async loadResources() {
 
         if (resourceName) {
           // Convert subscription URI to resource URI
-          // Example: TinyIoT/TinyFarm/designToolSub_TinyFarm -> TinyIoT/TinyFarm/resourceName
           const uriParts = sur.split('/');
           if (uriParts.length > 0 && uriParts[uriParts.length - 1].startsWith('designToolSub')) {
             uriParts.pop(); // Remove subscription name
           }
-          uriParts.push(resourceName); // Add actual resource name
+          // 자식 이벤트(CREATE/DELETE): 리소스 이름 추가
+          // 자기 자신 이벤트(UPDATE): 이름 추가하지 않음
+          if (net === 1 || (net === 3 && originalNet === 4)) {
+            uriParts.push(resourceName);
+          }
           resourceUri = uriParts.join('/');
-          console.log('[TRANSFORM] URI converted:', sur, '->', resourceUri);
+          console.log('[TRANSFORM] URI converted:', sur, '->', resourceUri, '(net=' + net + ')');
         }
       }
 
@@ -2444,6 +2555,12 @@ async loadResources() {
 
     async handleResourceCreated(uri, resource) {
       console.log('[NOTIFICATION] Resource created:', uri, resource);
+
+      // 디자인 툴에서 생성 중이면 알림 무시 (자체 생성 중복 방지)
+      if (this.isCreatingResources) {
+        console.log('[NOTIFICATION] Ignoring — design tool is creating resources');
+        return;
+      }
 
       // URI에서 리소스 정보 파싱
       // 예: TinyIoT/TestAE/newContainer
@@ -2567,8 +2684,25 @@ async loadResources() {
         }
       }
 
-      // 부모에 추가
-      parent.tasks.push(newResource);
+      // 부모에 추가 (맨 앞에 삽입하여 최신이 위로)
+      parent.tasks.unshift(newResource);
+
+      // 부모 childCount 갱신
+      if ((resourceType === 4 || resourceType === 58 || resourceType === 30) && parent.childCount !== undefined) {
+        parent.childCount++;
+      }
+
+      // 확대뷰에도 동기화
+      if (this.showZoomView && this.zoomedClone) {
+        const zoomParent = this.findNodeByRi([this.zoomedClone], parent.attrs?.ri);
+        if (zoomParent) {
+          const zoomCopy = JSON.parse(JSON.stringify(newResource));
+          zoomParent.tasks.unshift(zoomCopy);
+          if ((resourceType === 4 || resourceType === 58 || resourceType === 30) && zoomParent.childCount !== undefined) {
+            zoomParent.childCount++;
+          }
+        }
+      }
 
       // 번쩍이는 효과
       this.addFlashingEffect(uri);
@@ -2621,6 +2755,34 @@ async loadResources() {
           console.log('[NOTIFICATION] Resource will be deleted after flashing:', resourceName);
         }
 
+        // 확대뷰에도 동기화
+        if (this.showZoomView && this.zoomedClone) {
+          const zoomParent = this.findNodeByRi([this.zoomedClone], parent.attrs?.ri);
+          if (zoomParent) {
+            const zoomIdx = zoomParent.tasks.findIndex(r =>
+              (r.attrs && r.attrs.rn === resourceName) || r.name === resourceName
+            );
+            if (zoomIdx !== -1) {
+              const zoomRemoved = zoomParent.tasks[zoomIdx];
+              if (this.flashingEffectEnabled) {
+                zoomRemoved.flashing = true;
+              }
+              setTimeout(() => {
+                const zi = zoomParent.tasks.findIndex(r =>
+                  (r.attrs && r.attrs.rn === resourceName) || r.name === resourceName
+                );
+                if (zi !== -1) {
+                  const zr = zoomParent.tasks[zi];
+                  zoomParent.tasks.splice(zi, 1);
+                  if ((zr.ty === 4 || zr.ty === 58 || zr.ty === 30) && zoomParent.childCount > 0) {
+                    zoomParent.childCount--;
+                  }
+                }
+              }, this.flashingEffectEnabled ? 3000 : 0);
+            }
+          }
+        }
+
         // 효과 활성화 시 3초 후, 비활성화 시 즉시 제거
         const deleteDelay = this.flashingEffectEnabled ? 3000 : 0;
         setTimeout(() => {
@@ -2630,7 +2792,12 @@ async loadResources() {
           );
 
           if (currentIndex !== -1) {
+            const removed = parent.tasks[currentIndex];
             parent.tasks.splice(currentIndex, 1);
+            // 부모 childCount 갱신
+            if ((removed.ty === 4 || removed.ty === 58 || removed.ty === 30) && parent.childCount > 0) {
+              parent.childCount--;
+            }
             this.updateFullPaths();
             this.syncSessionStorage();
             console.log('[NOTIFICATION] Resource removed from tree:', resourceName);
@@ -2644,52 +2811,66 @@ async loadResources() {
     async handleResourceUpdated(uri, resource) {
       console.log('[NOTIFICATION] Resource updated:', uri, resource);
 
-      // 업데이트는 삭제 후 재생성으로 처리
-      await this.handleResourceDeleted(uri);
-      await this.handleResourceCreated(uri, resource);
+      // URI에서 기존 노드 찾기
+      const pathParts = uri.split('/').filter(p => p.length > 0);
+      if (pathParts.length < 2) return;
+      pathParts.shift(); // CSE 이름 제거
 
-      // 번쩍이는 효과
-      this.addFlashingEffect(uri);
-    },
+      let parent = this.cse1[0];
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        const found = this.findResourceByName(parent.tasks, pathParts[i]);
+        if (!found) return;
+        parent = found;
+      }
 
-    async handleToggleExpand(element, side = 'default') {
-      console.log('[TOGGLE] Element:', element.name, 'ty:', element.ty, 'expanded:', element.expanded);
-
-      // 토글은 CNT(ty=3)만 처리
-      if (element.ty !== 3) {
-        console.log('[TOGGLE] Not a CNT, ignoring toggle');
+      const resourceName = pathParts[pathParts.length - 1];
+      const existing = this.findResourceByName(parent.tasks, resourceName);
+      if (!existing) {
+        console.log('[NOTIFICATION] Updated resource not found in tree:', resourceName);
         return;
       }
 
-      // CNT 토글: CIN을 로드하거나 숨김
-      if (!element.expanded) {
-        // + 클릭 → 펼치기
-        if (!element.childrenLoaded) {
-          // 자식을 아직 로드하지 않았으면 서버에서 로드 (CIN은 최신 5개만)
-          try {
-            console.log('[TOGGLE] Loading children from server...');
-            await this.loadChildren(element);
-            element.childrenLoaded = true;
-
-            // 자식이 없으면 hasChildren을 false로 설정
-            if (!element.tasks || element.tasks.length === 0) {
-              console.log('[TOGGLE] No children found, hiding toggle');
-              element.hasChildren = false;
-              return; // 펼칠 필요 없음
-            }
-          } catch (error) {
-            console.error('[TOGGLE] Failed to load children:', error);
-            alert(`자식 리소스 로드 실패: ${error.message}`);
-            return;
-          }
-        } else {
-          console.log('[TOGGLE] Children already loaded, just expanding');
+      // 리소스 데이터에서 속성 추출 후 기존 노드 attrs만 갱신
+      let resourceData = null;
+      for (const key of Object.keys(resource)) {
+        if (key.startsWith('m2m:')) {
+          resourceData = resource[key];
+          break;
         }
-        element.expanded = true;
-      } else {
-        // − 클릭 → 접기
-        element.expanded = false;
       }
+
+      if (resourceData) {
+        for (const [k, v] of Object.entries(resourceData)) {
+          if (!k.startsWith('m2m:')) {
+            existing.attrs[k] = v;
+          }
+        }
+        // cni가 갱신되면 childCount도 동기화
+        if (resourceData.cni !== undefined) {
+          existing.childCount = resourceData.cni;
+        }
+        console.log('[NOTIFICATION] Updated attrs for:', resourceName);
+      }
+
+      // 확대뷰 동기화
+      if (this.showZoomView && this.zoomedClone && resourceData) {
+        const zoomNode = this.findNodeByRi([this.zoomedClone], existing.attrs?.ri);
+        if (zoomNode) {
+          for (const [k, v] of Object.entries(resourceData)) {
+            if (!k.startsWith('m2m:')) {
+              zoomNode.attrs[k] = v;
+            }
+          }
+          if (resourceData.cni !== undefined) {
+            zoomNode.childCount = resourceData.cni;
+          }
+          console.log('[NOTIFICATION] Zoom view also updated for:', resourceName);
+        }
+      }
+
+      // 번쩍이는 효과
+      this.addFlashingEffect(uri);
+      this.syncSessionStorage();
     },
 
     // Save expand state of all resources
@@ -2795,7 +2976,6 @@ async loadResources() {
 
       let resourcePath = element.fullPath;
       if (!resourcePath) {
-        // fullPath가 없으면 CSE base path + rn으로 구성
         if (element.attrs && element.attrs.rn) {
           resourcePath = target.basePath ? `${target.basePath}/${element.attrs.rn}` : element.attrs.rn;
         } else {
@@ -2803,204 +2983,94 @@ async loadResources() {
         }
       }
 
-      console.log('[LOAD CHILDREN] Using path:', resourcePath);
+      console.log('[LOAD CHILDREN] Using path:', resourcePath, '(rcn=4 single request)');
 
       try {
-        // CNT(ty=3)인 경우 CIN과 SUB를 분리해서 로드
-        let childUris = [];
+        // rcn=4 (attributes + child resources) 단일 요청
+        const rcn4Data = await retrieve_resource(
+          this.originator,
+          target.host,
+          target.port,
+          resourcePath,
+          'rcn=4'
+        );
 
-        if (element.ty === 3) {
-          // CNT: CIN(최신 5개) + SUB(전체) 분리 로드
-          console.log(`[LOAD CHILDREN] Loading CIN and SUB separately for CNT...`);
+        console.log('[LOAD CHILDREN] rcn=4 response keys:', Object.keys(rcn4Data));
 
-          // 1. CIN 로드 (ty=4, 최신 5개만)
-          try {
-            const cinUriList = await retrieve_resource(
-              this.originator,
-              target.host,
-              target.port,
-              resourcePath,
-              'fu=1&ty=4&lvl=1&lim=5' 
-            );
-            let cinUris = cinUriList['m2m:uril'] || [];
-            if (typeof cinUris === 'string') {
-              cinUris = cinUris.trim().split(/\s+/).filter(u => u.length > 0);
-            }
-            console.log(`[LOAD CHILDREN] Found ${cinUris.length} CIN(s):`, cinUris);
-            childUris.push(...cinUris);
-          } catch (error) {
-            console.log('[LOAD CHILDREN] No CIN found or error:', error.message);
-          }
-
-          // 2. SUB 로드 (ty=23, 전체)
-          try {
-            const subUriList = await retrieve_resource(
-              this.originator,
-              target.host,
-              target.port,
-              resourcePath,
-              'fu=1&ty=23'  // SUB 타입, 전체
-            );
-            const subUris = subUriList['m2m:uril'] || [];
-            console.log(`[LOAD CHILDREN] Found ${subUris.length} SUB(s):`, subUris);
-            childUris.push(...subUris);
-          } catch (error) {
-            console.log('[LOAD CHILDREN] No SUB found or error:', error.message);
-          }
-        } else if (element.ty === 29) {
-          // TS: TSI(최신 5개) + SUB(전체) 분리 로드
-          console.log(`[LOAD CHILDREN] Loading TSI and SUB separately for TS...`);
-
-          // 1. TSI 로드 (ty=30, 최신 5개만)
-          try {
-            const tsiUriList = await retrieve_resource(
-              this.originator,
-              target.host,
-              target.port,
-              resourcePath,
-              'fu=1&ty=30&lvl=1&lim=5' 
-            );
-            let tsiUris = tsiUriList['m2m:uril'] || [];
-            if (typeof tsiUris === 'string') {
-              tsiUris = tsiUris.trim().split(/\s+/).filter(u => u.length > 0);
-            }
-            console.log(`[LOAD CHILDREN] Found ${tsiUris.length} TSI(s):`, tsiUris);
-            childUris.push(...tsiUris);
-          } catch (error) {
-            console.log('[LOAD CHILDREN] No TSI found or error:', error.message);
-          }
-
-          // 2. SUB 로드 (ty=23, 전체)
-          try {
-            const subUriList = await retrieve_resource(
-              this.originator,
-              target.host,
-              target.port,
-              resourcePath,
-              'fu=1&ty=23'  // SUB 타입, 전체
-            );
-            const subUris = subUriList['m2m:uril'] || [];
-            console.log(`[LOAD CHILDREN] Found ${subUris.length} SUB(s):`, subUris);
-            childUris.push(...subUris);
-          } catch (error) {
-            console.log('[LOAD CHILDREN] No SUB found or error:', error.message);
-          }
-        } else {
-          // CNT가 아닌 경우 기존 로직
-          console.log(`[LOAD CHILDREN] Discovering direct children...`);
-
-          const uriList = await retrieve_resource(
-            this.originator,
-            target.host,
-            target.port,
-            resourcePath,
-            'fu=1'
-          );
-          childUris = uriList['m2m:uril'] || [];
-        }
-
-        console.log(`[LOAD CHILDREN] Total URIs: ${childUris.length}`, childUris);
-
-        // 중간 경로 추출 (Discovery가 leaf만 반환하는 경우 대비)
-        const cleanPath = resourcePath.startsWith('/') ? resourcePath.substring(1) : resourcePath;
-        const directChildrenSet = new Set();
-
-        for (const uri of childUris) {
-          const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
-          if (cleanUri.startsWith(cleanPath + '/')) {
-            const remaining = cleanUri.substring(cleanPath.length + 1);
-            const firstPart = remaining.split('/')[0];
-            directChildrenSet.add(cleanPath + '/' + firstPart);
+        // 응답에서 래퍼(부모) 객체 추출
+        let parentObj = null;
+        for (const key of Object.keys(rcn4Data)) {
+          if (key.startsWith('m2m:')) {
+            parentObj = rcn4Data[key];
+            break;
           }
         }
 
-        const directChildren = Array.from(directChildrenSet);
-        console.log(`[LOAD CHILDREN] Direct children: ${directChildren.length}`, directChildren);
+        if (!parentObj) {
+          console.log('[LOAD CHILDREN] No parent object in response');
+          element.hasChildren = false;
+          element.tasks = [];
+          element.childrenLoaded = true;
+          this.updateFullPaths();
+          this.syncSessionStorage();
+          return;
+        }
 
-        // 직속 자식만 사용 (이미 ty와 lim으로 필터링됨)
-        childUris = directChildren;
-
-        // 각 자식 리소스의 정보 가져오기
+        // 부모 객체 내 m2m:* 키 순회 → 자식 리소스 배열 수집
         const allChildren = [];
-        for (const uri of childUris) {
-          try {
-            console.log(`[LOAD CHILDREN] Loading: ${uri}`);
-            const resData = await retrieve_resource(
-              this.originator,
-              target.host,
-              target.port,
-              uri,
-              ''
-            );
+        for (const key of Object.keys(parentObj)) {
+          if (!key.startsWith('m2m:')) continue;
+          let items = parentObj[key];
+          if (!Array.isArray(items)) items = [items];
 
-            // oneM2M 응답에서 리소스 추출
-            let resourceNode = null;
-            for (const key of Object.keys(resData)) {
-              if (key.startsWith('m2m:')) {
-                resourceNode = resData[key];
-                break;
-              }
-            }
-
-            if (resourceNode) {
-              const cbs = resourceNode.cbs;
-              let hasChildren;
-
-              console.log(`[LOAD CHILDREN] ${uri}: ty=${resourceNode.ty}, cbs=${cbs}`);
-
-              // hasChildren은 CNT(ty=3), FCNT(ty=28), TS(ty=29)이면서 cbs > 0인 경우만 true
-              hasChildren = false;
-              if (resourceNode.ty === 3 || resourceNode.ty === 28 || resourceNode.ty === 29) {
-                if (typeof cbs === 'number' && cbs > 0) {
-                  hasChildren = true;
-                  console.log(`  → ty=${resourceNode.ty} with cbs=${cbs}, hasChildren=true`);
-                } else if (cbs !== undefined && cbs !== null && cbs !== '' && !isNaN(Number(cbs))) {
-                  const cbsNum = Number(cbs);
-                  hasChildren = cbsNum > 0;
-                  console.log(`  → ty=${resourceNode.ty} with cbs=${cbsNum} (converted), hasChildren=${hasChildren}`);
-                } else {
-                  console.log(`  → ty=${resourceNode.ty} with no cbs, hasChildren=false`);
-                }
-              } else {
-                // 나머지 리소스는 hasChildren = false (토글 없이 항상 표시)
-                console.log(`  → Not CNT/FCNT/TS, hasChildren=false`);
-              }
-
-              const childTypeName = this.getTypeNameFromTy(resourceNode.ty);
-              const converted = this.convertNodeShallow(resourceNode, childTypeName);
-
-              converted.hasChildren = hasChildren;
-              converted.childrenLoaded = false;
-              converted.attrs = converted.attrs || {};
-              converted.attrs.cbs = cbs;
-
-              allChildren.push(converted);
-            }
-          } catch (error) {
-            console.error(`[LOAD CHILDREN] Failed to load ${uri}:`, error);
+          for (const item of items) {
+            if (!item || typeof item !== 'object' || item.ty === undefined) continue;
+            const typeName = this.getTypeNameFromTy(item.ty);
+            const converted = this.convertNodeShallow(item, typeName);
+            converted.childrenLoaded = false;
+            allChildren.push(converted);
           }
         }
 
-        // CIN/FCIN/TSI는 ct(생성시간) 내림차순 정렬 — 최신이 맨 위
-        allChildren.sort((a, b) => {
-          const isInstA = (a.ty === 4 || a.ty === 58 || a.ty === 30);
-          const isInstB = (b.ty === 4 || b.ty === 58 || b.ty === 30);
-          if (isInstA && isInstB) {
-            return (b.attrs?.ct || '').localeCompare(a.attrs?.ct || '');
+        console.log(`[LOAD CHILDREN] Parsed ${allChildren.length} children from rcn=4`);
+
+        // 타입별 필터링: CIN(4), FCIN(58), TSI(30), SUB(23) → ct 내림차순 최신 1개만
+        const instanceTypes = new Set([4, 58, 30, 23]);
+        const kept = [];        // 인스턴스가 아닌 리소스 (전부 유지)
+        const byType = {};      // 인스턴스 타입별 수집
+
+        for (const child of allChildren) {
+          if (instanceTypes.has(child.ty)) {
+            if (!byType[child.ty]) byType[child.ty] = [];
+            byType[child.ty].push(child);
+          } else {
+            kept.push(child);
           }
-          // 인스턴스가 아닌 리소스(SUB 등)는 앞에 유지
+        }
+
+        // 각 인스턴스 타입에서 ct 내림차순 정렬 후 최신 1개만 유지
+        for (const ty of Object.keys(byType)) {
+          byType[ty].sort((a, b) => (b.attrs?.ct || '').localeCompare(a.attrs?.ct || ''));
+          kept.push(byType[ty][0]); // 최신 1개
+        }
+
+        // 정렬: 일반 리소스 먼저, 인스턴스(CIN/FCIN/TSI/SUB) 나중
+        kept.sort((a, b) => {
+          const isInstA = instanceTypes.has(a.ty);
+          const isInstB = instanceTypes.has(b.ty);
           if (!isInstA && isInstB) return -1;
           if (isInstA && !isInstB) return 1;
           return 0;
         });
-        console.log(`[LOAD CHILDREN] Total children loaded: ${allChildren.length}`);
 
-        if (allChildren.length === 0) {
+        console.log(`[LOAD CHILDREN] After filtering: ${kept.length} children`);
+
+        if (kept.length === 0) {
           console.log('[LOAD CHILDREN] No children found, hiding toggle');
           element.hasChildren = false;
           element.tasks = [];
         } else {
-          element.tasks = allChildren;
+          element.tasks = kept;
         }
 
         element.childrenLoaded = true;
@@ -3271,6 +3341,17 @@ async loadResources() {
 
       // flashing 플래그 추가
       resource.flashing = true;
+
+      // 확대뷰에도 flashing 적용
+      if (this.showZoomView && this.zoomedClone) {
+        const zoomNode = this.findNodeByRi([this.zoomedClone], resource.attrs?.ri);
+        if (zoomNode) {
+          zoomNode.flashing = true;
+          setTimeout(() => {
+            zoomNode.flashing = false;
+          }, 3000);
+        }
+      }
 
       // 3초 후 제거
       setTimeout(() => {
