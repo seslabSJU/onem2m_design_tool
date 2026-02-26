@@ -660,7 +660,7 @@ export default {
         try {
           const path = node.fullPath;
           const disc = await retrieve_resource(
-            this.originator, target.host, target.port, path, `fu=1&ty=4&lim=${limit}`
+            this.originator, target.host, target.port, path, `fu=1&ty=4&lvl=1&lim=${limit}`
           );
           let uris = disc['m2m:uril'] || [];
           if (typeof uris === 'string') {
@@ -697,7 +697,7 @@ export default {
         try {
           const path = node.fullPath;
           const disc = await retrieve_resource(
-            this.originator, target.host, target.port, path, `fu=1&ty=58&lim=${limit}`
+            this.originator, target.host, target.port, path, `fu=1&ty=58&lvl=1&lim=${limit}`
           );
           let uris = disc['m2m:uril'] || [];
           if (typeof uris === 'string') {
@@ -746,7 +746,7 @@ export default {
         try {
           const path = node.fullPath;
           const disc = await retrieve_resource(
-            this.originator, target.host, target.port, path, `fu=1&ty=30&lim=${limit}`
+            this.originator, target.host, target.port, path, `fu=1&ty=30&lvl=1&lim=${limit}`
           );
           let uris = disc['m2m:uril'] || [];
           if (typeof uris === 'string') {
@@ -2820,7 +2820,7 @@ async loadResources() {
               target.host,
               target.port,
               resourcePath,
-              'fu=1&ty=4&lim=5'  // CIN 타입, 최신 5개
+              'fu=1&ty=4&lvl=1&lim=5' 
             );
             let cinUris = cinUriList['m2m:uril'] || [];
             if (typeof cinUris === 'string') {
@@ -2858,7 +2858,7 @@ async loadResources() {
               target.host,
               target.port,
               resourcePath,
-              'fu=1&ty=30&lim=5'  // TSI 타입, 최신 5개
+              'fu=1&ty=30&lvl=1&lim=5' 
             );
             let tsiUris = tsiUriList['m2m:uril'] || [];
             if (typeof tsiUris === 'string') {
