@@ -112,7 +112,7 @@ class RemoteCSE {
     async loadResourcesFromCSE(resourceType) {
       console.log(`Loading ${resourceType} from Remote CSE:`, this.targetIP);
       if (!this.targetIP) {
-        alert("Please input CSE IP address");
+        alert("Please input CSE IP Address");
         return;
       }
   

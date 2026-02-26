@@ -164,13 +164,20 @@ export async function make_update_request(currentNode, path, targetIP)
   }
 
   // FCNT: 스키마에 없는 SDT 커스텀 속성도 body에 포함
+  // TinyIoT는 custom_attrs 내부 값으로 FCIN 스냅샷을 생성하므로
+  // UPDATE 시 custom_attrs 객체에도 함께 전달해야 함
   if (currentNode.ty == 28) {
     const knownKeys = new Set(attrList || []);
+    const customAttrs = {};
     Object.entries(currentNode.attrs || {}).forEach(([key, val]) => {
       if (!knownKeys.has(key) && !readOnlyAttrs.includes(key)) {
         resource[key] = val;
+        customAttrs[key] = val;
       }
     });
+    if (Object.keys(customAttrs).length > 0) {
+      resource['custom_attrs'] = customAttrs;
+    }
   }
 
   // 빈 값('', null, undefined)은 요청에서 제외 — 서버 기본값 사용

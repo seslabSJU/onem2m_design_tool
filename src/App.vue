@@ -89,7 +89,7 @@
       <input type="text" v-model="originator" />
     </div>
     <div class="box" style = "borderRadius: 10px">
-      <div class="key" style="color: white">IP address</div>
+      <div class="key" style="color: white">IP Address</div>
       <input type="text" v-model="targetIP" placeholder="http://127.0.0.1:3000/TinyIoT" />
     </div>
     <div>
@@ -105,7 +105,7 @@
       background: linear-gradient(145deg, #1e3a5f, #152238);
       color: white;
       box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.3), -4px -4px 12px rgba(255, 255, 255, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      border-radius: 15px"> Resource load</div>
+      border-radius: 15px"> Resource Load</div>
       <div
         class="btn button"
         @click="connectWebsocket"
@@ -266,8 +266,10 @@
           this.attrSettingModified = false;
           Object.entries(newElement).forEach(([key, value]) => {
             const val = value.value;
-            if(val === '' || (Array.isArray(val) && val.length === 0))
+            if(val === '' || (Array.isArray(val) && val.length === 0)) {
+              delete this.selectedElement.attrs[key];
               return;
+            }
 
             if(val === 0 && value.type !== 'Number'){
               return;
@@ -287,6 +289,13 @@
           // 속성이 변경되었으므로 modified 플래그 설정 (UPDATE 대상 표시)
           if (this.selectedElement.createdOnServer) {
             this.selectedElement.modified = true;
+          }
+          // 줌뷰 열려있으면 변경된 속성 동기화
+          if (this.showZoomView && this.zoomedClone) {
+            const zNode = this.findNodeById(this.zoomedClone, this.selectedElement.id);
+            if (zNode) {
+              zNode.attrs = JSON.parse(JSON.stringify(this.selectedElement.attrs));
+            }
           }
           callback();
       }"
@@ -606,6 +615,30 @@ export default {
       this.zoomedClone = null;
     },
 
+    // 트리에서 id로 노드 찾기 (줌뷰 동기화용)
+    findNodeById(node, id) {
+      if (node.id === id) return node;
+      if (node.tasks) {
+        for (const child of node.tasks) {
+          const found = this.findNodeById(child, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    },
+
+    // 트리에서 ri(Resource ID)로 노드 찾기 (리로드 후 줌뷰 갱신용)
+    findNodeByRi(tree, ri) {
+      for (const node of tree) {
+        if (node.attrs?.ri === ri) return node;
+        if (node.tasks) {
+          const found = this.findNodeByRi(node.tasks, ri);
+          if (found) return found;
+        }
+      }
+      return null;
+    },
+
     // 클론에서 CIN/FCIN 노드 제거 (줌뷰 로드 전 정리)
     stripCloneInstances(node) {
       if (node.tasks) {
@@ -634,6 +667,7 @@ export default {
             uris = uris.trim().split(/\s+/).filter(u => u.length > 0);
           }
 
+          const cinNodes = [];
           for (const uri of uris) {
             const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
             try {
@@ -641,12 +675,15 @@ export default {
                 this.originator, target.host, target.port, cleanUri, ''
               );
               if (cinData['m2m:cin']) {
-                node.tasks.push(this.convertNode(cinData['m2m:cin'], 'CIN', 0, false));
+                cinNodes.push(this.convertNode(cinData['m2m:cin'], 'CIN', 0, false));
               }
             } catch (err) {
               console.warn(`[loadInstances] Failed to load CIN: ${cleanUri}`);
             }
           }
+          // ct(생성시간) 내림차순 정렬 — 최신이 맨 위
+          cinNodes.sort((a, b) => (b.attrs?.ct || '').localeCompare(a.attrs?.ct || ''));
+          node.tasks.push(...cinNodes);
           node.instancesLoaded = true;
           node.instancesLoadedAll = (uris.length < limit);
           console.log(`[loadInstances] Loaded ${uris.length} CINs for ${node.attrs?.rn}`);
@@ -669,9 +706,8 @@ export default {
           if (!Array.isArray(uris)) {
             uris = [uris];
           }
-          // 최신 FCIN이 먼저 오도록 역순 정렬
-          uris.reverse();
 
+          const fcinNodes = [];
           for (const uri of uris) {
             const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
             try {
@@ -689,12 +725,15 @@ export default {
                 }
               }
               if (fcinNode) {
-                node.tasks.push(this.convertNode(fcinNode, 'FCIN', 0, false));
+                fcinNodes.push(this.convertNode(fcinNode, 'FCIN', 0, false));
               }
             } catch (err) {
               console.warn(`[loadInstances] Failed to load FCIN: ${cleanUri}`);
             }
           }
+          // ct(생성시간) 내림차순 정렬 — 최신이 맨 위
+          fcinNodes.sort((a, b) => (b.attrs?.ct || '').localeCompare(a.attrs?.ct || ''));
+          node.tasks.push(...fcinNodes);
           node.instancesLoaded = true;
           node.instancesLoadedAll = (uris.length < limit);
         } catch (error) {
@@ -717,6 +756,7 @@ export default {
             uris = [uris];
           }
 
+          const tsiNodes = [];
           for (const uri of uris) {
             const cleanUri = uri.startsWith('/') ? uri.substring(1) : uri;
             try {
@@ -724,12 +764,15 @@ export default {
                 this.originator, target.host, target.port, cleanUri, ''
               );
               if (tsiData['m2m:tsi']) {
-                node.tasks.push(this.convertNode(tsiData['m2m:tsi'], 'TSI', 0, false));
+                tsiNodes.push(this.convertNode(tsiData['m2m:tsi'], 'TSI', 0, false));
               }
             } catch (err) {
               console.warn(`[loadInstances] Failed to load TSI: ${cleanUri}`);
             }
           }
+          // ct(생성시간) 내림차순 정렬 — 최신이 맨 위
+          tsiNodes.sort((a, b) => (b.attrs?.ct || '').localeCompare(a.attrs?.ct || ''));
+          node.tasks.push(...tsiNodes);
           node.instancesLoaded = true;
           node.instancesLoadedAll = (uris.length < limit);
           console.log(`[loadInstances] Loaded ${uris.length} TSIs for ${node.attrs?.rn}`);
@@ -937,7 +980,7 @@ async loadResources() {
     sessionStorage.setItem('targetIP', this.targetIP);
 
     if (this.targetIP === "") {
-      alert("Please input CSE IP address");
+      alert("Please input CSE IP Address");
       return;
     }
 
@@ -996,6 +1039,19 @@ async loadResources() {
       // fullPath 업데이트
       this.updateFullPaths();
       this.syncSessionStorage();
+
+      // 줌뷰 열려있으면 새 트리에서 같은 노드 찾아서 갱신
+      if (this.showZoomView && this.zoomedAE) {
+        const ri = this.zoomedAE.attrs?.ri;
+        if (ri) {
+          const found = this.findNodeByRi(this.cse1, ri);
+          if (found) {
+            await this.openZoomView(found);
+          } else {
+            this.closeZoomView();
+          }
+        }
+      }
 
       const endTime = performance.now();
 
@@ -1086,7 +1142,14 @@ async loadResources() {
         // FCNT/FCIN의 경우 SDT 커스텀 속성 보존 (스키마에 없는 나머지 속성 전부 복사)
         if (node.ty === 28 || node.ty === 58) {
             const skipKeys = ['ri', 'ct', 'lt', 'pi', 'et', 'st', 'ty', 'cni', 'cbs'];
-            // custom_attrs 객체가 있으면 먼저 펼쳐서 개별 속성으로 저장
+            // 최상위 속성을 먼저 저장 (PUT으로 업데이트된 최신값)
+            Object.keys(node).forEach((key) => {
+                if (!key.startsWith('m2m:') && !key.startsWith('cod:') && key !== 'custom_attrs'
+                    && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
+                    baseAttrs[key] = node[key];
+                }
+            });
+            // custom_attrs는 최상위에 없는 속성만 fallback으로 추가
             if (node['custom_attrs'] && typeof node['custom_attrs'] === 'object' && !Array.isArray(node['custom_attrs'])) {
                 Object.entries(node['custom_attrs']).forEach(([cKey, cVal]) => {
                     if (baseAttrs[cKey] === undefined) {
@@ -1094,13 +1157,6 @@ async loadResources() {
                     }
                 });
             }
-            Object.keys(node).forEach((key) => {
-                // custom_attrs는 이미 펼쳤으므로 skip, cod: 키는 자식 리소스이므로 skip
-                if (!key.startsWith('m2m:') && !key.startsWith('cod:') && key !== 'custom_attrs'
-                    && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
-                    baseAttrs[key] = node[key];
-                }
-            });
         }
 
         // 토글 제거: 모든 리소스의 hasChildren = false (토글 버튼 숨김)
@@ -1303,7 +1359,7 @@ async loadResources() {
       console.log(this.targetIP);
       sessionStorage.setItem('targetIP', this.targetIP);
       if(this.targetIP === ""){
-        alert("Please input CSE IP address");
+        alert("Please input CSE IP Address");
         return;
       }
       const url = this.targetIP;
@@ -2766,7 +2822,10 @@ async loadResources() {
               resourcePath,
               'fu=1&ty=4&lim=5'  // CIN 타입, 최신 5개
             );
-            const cinUris = cinUriList['m2m:uril'] || [];
+            let cinUris = cinUriList['m2m:uril'] || [];
+            if (typeof cinUris === 'string') {
+              cinUris = cinUris.trim().split(/\s+/).filter(u => u.length > 0);
+            }
             console.log(`[LOAD CHILDREN] Found ${cinUris.length} CIN(s):`, cinUris);
             childUris.push(...cinUris);
           } catch (error) {
@@ -2801,7 +2860,10 @@ async loadResources() {
               resourcePath,
               'fu=1&ty=30&lim=5'  // TSI 타입, 최신 5개
             );
-            const tsiUris = tsiUriList['m2m:uril'] || [];
+            let tsiUris = tsiUriList['m2m:uril'] || [];
+            if (typeof tsiUris === 'string') {
+              tsiUris = tsiUris.trim().split(/\s+/).filter(u => u.length > 0);
+            }
             console.log(`[LOAD CHILDREN] Found ${tsiUris.length} TSI(s):`, tsiUris);
             childUris.push(...tsiUris);
           } catch (error) {
@@ -2919,6 +2981,18 @@ async loadResources() {
           }
         }
 
+        // CIN/FCIN/TSI는 ct(생성시간) 내림차순 정렬 — 최신이 맨 위
+        allChildren.sort((a, b) => {
+          const isInstA = (a.ty === 4 || a.ty === 58 || a.ty === 30);
+          const isInstB = (b.ty === 4 || b.ty === 58 || b.ty === 30);
+          if (isInstA && isInstB) {
+            return (b.attrs?.ct || '').localeCompare(a.attrs?.ct || '');
+          }
+          // 인스턴스가 아닌 리소스(SUB 등)는 앞에 유지
+          if (!isInstA && isInstB) return -1;
+          if (isInstA && !isInstB) return 1;
+          return 0;
+        });
         console.log(`[LOAD CHILDREN] Total children loaded: ${allChildren.length}`);
 
         if (allChildren.length === 0) {
@@ -3017,7 +3091,14 @@ async loadResources() {
         // FCNT/FCIN의 경우 SDT 커스텀 속성 보존 (스키마에 없는 나머지 속성 전부 복사)
         if (node.ty === 28 || node.ty === 58) {
             const skipKeys = ['ri', 'ct', 'lt', 'pi', 'et', 'st', 'ty', 'cni', 'cbs'];
-            // custom_attrs 객체가 있으면 먼저 펼쳐서 개별 속성으로 저장
+            // 최상위 속성을 먼저 저장 (PUT으로 업데이트된 최신값)
+            Object.keys(node).forEach((key) => {
+                if (!key.startsWith('m2m:') && !key.startsWith('cod:') && key !== 'custom_attrs'
+                    && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
+                    baseAttrs[key] = node[key];
+                }
+            });
+            // custom_attrs는 최상위에 없는 속성만 fallback으로 추가
             if (node['custom_attrs'] && typeof node['custom_attrs'] === 'object' && !Array.isArray(node['custom_attrs'])) {
                 Object.entries(node['custom_attrs']).forEach(([cKey, cVal]) => {
                     if (baseAttrs[cKey] === undefined) {
@@ -3025,13 +3106,6 @@ async loadResources() {
                     }
                 });
             }
-            Object.keys(node).forEach((key) => {
-                // custom_attrs는 이미 펼쳤으므로 skip, cod: 키는 자식 리소스이므로 skip
-                if (!key.startsWith('m2m:') && !key.startsWith('cod:') && key !== 'custom_attrs'
-                    && baseAttrs[key] === undefined && !skipKeys.includes(key)) {
-                    baseAttrs[key] = node[key];
-                }
-            });
         }
 
         // hasChildren: CNT(ty=3) 또는 FCNT(ty=28)이면서 인스턴스가 있는 경우 true

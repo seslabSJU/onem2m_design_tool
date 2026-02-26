@@ -29,7 +29,7 @@ You can create resources or a resource tree.
    <p/>
 <br/>
       
-### 3. Resource load 🫵
+### 3. Resource Load 🫵
 You can retrieve resources
 <p align = "center">
    <img src = "https://github.com/seslabSJU/onem2m_design_tool/blob/main/images/Resource%20load.gif" width ="70%" height = "50%">
