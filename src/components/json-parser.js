@@ -86,7 +86,7 @@ export async function make_request_resource(currentNode, path, targetIP, origina
     9:  ['ty', 'rn', 'lbl', 'macp', 'at', 'aa', 'ast', 'cr', 'csy', 'gn', 'mt', 'mnm', 'mid', 'macpi'], // GRP
     23: ['ty', 'rn', 'lbl', 'cr', 'acpi', 'enc', 'nu', 'su', 'nec', 'ln', 'nct', 'exc'],                 // SUB
     28: ['ty', 'rn', 'lbl', 'acpi', 'cnd', 'or', 'cr', 'mni', 'mbs', 'mia', 'fcied'],                     // FCNT
-    58: ['ty', 'rn', 'lbl', 'con', 'cs'],                                                                  // FCIN
+    58: ['ty', 'rn', 'lbl', 'cs'],                                                                         // FCIN
     29: ['ty', 'rn', 'lbl', 'acpi', 'cr', 'mni', 'mbs', 'pei', 'peid', 'mdd', 'mdn', 'mdt', 'mdc', 'mdlt', 'cnf'], // TS
     30: ['ty', 'rn', 'lbl', 'con', 'dgt', 'snr'],                                                          // TSI
   };

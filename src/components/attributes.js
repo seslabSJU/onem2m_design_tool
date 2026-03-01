@@ -821,14 +821,6 @@ export const resourceAttributes = {
             disable: false,
             value: []
         },
-        'con': {
-            type: "text",
-            fullName: "Content",
-            description: "The actual data content of the FlexContainerInstance",
-            required: false,
-            disable: false,
-            value: ''
-        },
         'cs': {
             type: "Number",
             fullName: "Content Size",
